@@ -1,21 +1,42 @@
 const pool = require("../db");
 
-exports.createUser = async ({ username, email, password }) => {
- const res = await pool.query(
-  `INSERT INTO users (
-      username,
-      email,
-      password
-   )
-   VALUES ($1, $2, $3)
-   RETURNING
-      id,
-      username,
-      email,
-      profile_pic,
-      description`,
-  [username, email, password]
-);
+exports.createUser = async ({
+  username,
+  email,
+  password
+}) => {
+  const result = await pool.query(
+    `INSERT INTO users (
+        username,
+        email,
+        password,
+        avatar,
+        is_online,
+        top_score,
+        xp
+     )
+     VALUES (
+        $1,
+        $2,
+        $3,
+        NULL,
+        FALSE,
+        0,
+        0
+     )
+     RETURNING
+        id,
+        username,
+        email,
+        avatar,
+        is_online,
+        top_score,
+        xp,
+        created_at`,
+    [username, email, password]
+  );
+
+  return result.rows[0];
 };
 
 exports.findUserByEmail = async (email) => {
