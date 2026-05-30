@@ -3,8 +3,9 @@ require('dotenv').config();
 const cors = require('cors')
 const PORT = process.env.PORT || 8081;
 const app = express();
+const pool = require('./db')
 const cookieParser = require("cookie-parser");
-
+const authrouter = require('./routes/auth')
 app.use(cookieParser());
 
 app.get('/health', async (req, res) => {
@@ -16,6 +17,6 @@ app.get('/health', async (req, res) => {
   }
 });
 app.use(express.json());
-
+app.use('/auth',authrouter);
 
 app.listen(PORT, () => { console.log(`server is running on port ${PORT}...`) })   
