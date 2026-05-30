@@ -85,8 +85,6 @@ exports.updateUser = async (
   return result.rows[0];
 };
 
-/* OTP METHODS */
-
 exports.saveLoginOtp = async (
   userId,
   otp,
