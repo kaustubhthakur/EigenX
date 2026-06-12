@@ -120,30 +120,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-exports.updateOnlineStatus = async (req, res) => {
-  try {
-    const { is_online } = req.body;
-
-    const user = await User.updateOnlineStatus(
-      req.user.id,
-      is_online
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Online status updated",
-      user
-    });
-  } catch (error) {
-    console.error(error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update status"
-    });
-  }
-};
-
 exports.updateScore = async (req, res) => {
   try {
     const { score, xp } = req.body;
