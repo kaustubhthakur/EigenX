@@ -99,3 +99,42 @@ exports.getFriends = async (
 
   return result.rows;
 };
+exports.getPendingRequests = async (
+  userId
+) => {
+  const result = await pool.query(
+    `
+    SELECT
+      fr.id,
+      u.id AS sender_id,
+      u.username,
+      u.avatar,
+      fr.created_at
+    FROM friend_requests fr
+    JOIN users u
+      ON u.id = fr.sender_id
+    WHERE fr.receiver_id = $1
+      AND fr.status = 'pending'
+    ORDER BY fr.created_at DESC
+    `,
+    [userId]
+  );
+
+  return result.rows;
+};
+
+exports.removeFriend = async (
+  userId,
+  friendId
+) => {
+  await pool.query(
+    `
+    DELETE FROM friends
+    WHERE
+      (user_id = $1 AND friend_id = $2)
+      OR
+      (user_id = $2 AND friend_id = $1)
+    `,
+    [userId, friendId]
+  );
+};
