@@ -8,7 +8,8 @@ const { Server } = require("socket.io");
 const pool = require("./db");
 
 const authrouter = require("./routes/auth");
-
+const userrouter = require("./routes/users")
+const dashboardrouter = require('./routes/dashboard')
 const PORT = process.env.PORT || 8081;
 
 const app = express();
@@ -18,7 +19,8 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/auth", authrouter);
-
+app.use("/users",userrouter)
+app.use("/dashboard",dashboardrouter)
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
