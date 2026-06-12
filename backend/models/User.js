@@ -6,33 +6,36 @@ exports.createUser = async ({
   password
 }) => {
   const result = await pool.query(
-    `INSERT INTO users (
-        username,
-        email,
-        password,
-        avatar,
-        is_online,
-        top_score,
-        xp
-     )
-     VALUES (
-        $1,
-        $2,
-        $3,
-        NULL,
-        FALSE,
-        0,
-        0
-     )
-     RETURNING
-        id,
-        username,
-        email,
-        avatar,
-        is_online,
-        top_score,
-        xp,
-        created_at`,
+    `
+    INSERT INTO users (
+      username,
+      email,
+      password,
+      avatar,
+      is_online,
+      top_score,
+      xp
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      NULL,
+      FALSE,
+      0,
+      0
+    )
+    RETURNING
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      created_at
+    `,
     [username, email, password]
   );
 
@@ -40,38 +43,60 @@ exports.createUser = async ({
 };
 
 exports.findUserByEmail = async (email) => {
-  const res = await pool.query(
-    "SELECT * FROM users WHERE email = $1",
+  const result = await pool.query(
+    `
+    SELECT *
+    FROM users
+    WHERE email = $1
+    `,
     [email]
   );
 
-  return res.rows[0];
+  return result.rows[0];
 };
 
 exports.findUserByUsername = async (username) => {
-  const res = await pool.query(
-    "SELECT * FROM users WHERE username = $1",
+  const result = await pool.query(
+    `
+    SELECT *
+    FROM users
+    WHERE username = $1
+    `,
     [username]
   );
 
-  return res.rows[0];
+  return result.rows[0];
 };
 
 exports.findUserById = async (id) => {
-  const res = await pool.query(
-    "SELECT * FROM users WHERE id = $1",
+  const result = await pool.query(
+    `
+    SELECT *
+    FROM users
+    WHERE id = $1
+    `,
     [id]
   );
 
-  return res.rows[0];
+  return result.rows[0];
 };
 
 exports.getUser = async (id) => {
   const result = await pool.query(
-    `SELECT id, username, email, profile_pic,
-            favorite_team, created_at
-     FROM users
-     WHERE id = $1`,
+    `
+    SELECT
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      created_at
+    FROM users
+    WHERE id = $1
+    `,
     [id]
   );
 
@@ -80,9 +105,20 @@ exports.getUser = async (id) => {
 
 exports.getAllUsers = async () => {
   const result = await pool.query(
-    `SELECT id, username, email, profile_pic,
-            favorite_team, created_at
-     FROM users`
+    `
+    SELECT
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      created_at
+    FROM users
+    ORDER BY top_score DESC
+    `
   );
 
   return result.rows;
@@ -90,17 +126,78 @@ exports.getAllUsers = async () => {
 
 exports.updateUser = async (
   id,
-  { profile_pic, favorite_team }
+  {
+    username,
+    avatar
+  }
 ) => {
   const result = await pool.query(
-    `UPDATE users
-     SET profile_pic = COALESCE($1, profile_pic),
-         favorite_team = COALESCE($2, favorite_team)
-     WHERE id = $3
-     RETURNING id, username, email,
-               profile_pic, favorite_team,
-               created_at`,
-    [profile_pic, favorite_team, id]
+    `
+    UPDATE users
+    SET
+      username = COALESCE($1, username),
+      avatar = COALESCE($2, avatar)
+    WHERE id = $3
+    RETURNING
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      created_at
+    `,
+    [username, avatar, id]
+  );
+
+  return result.rows[0];
+};
+
+exports.updateOnlineStatus = async (
+  userId,
+  isOnline
+) => {
+  const result = await pool.query(
+    `
+    UPDATE users
+    SET
+      is_online = $1,
+      last_seen = NOW()
+    WHERE id = $2
+    RETURNING *
+    `,
+    [isOnline, userId]
+  );
+
+  return result.rows[0];
+};
+
+exports.updateScoreAndXp = async (
+  userId,
+  score,
+  xp
+) => {
+  const result = await pool.query(
+    `
+    UPDATE users
+    SET
+      top_score = GREATEST(top_score, $1),
+      xp = xp + $2
+    WHERE id = $3
+    RETURNING
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      created_at
+    `,
+    [score, xp, userId]
   );
 
   return result.rows[0];
@@ -112,20 +209,27 @@ exports.saveLoginOtp = async (
   expiresAt
 ) => {
   await pool.query(
-    `INSERT INTO login_otps
-      (user_id, otp, expires_at)
-     VALUES ($1, $2, $3)`,
+    `
+    INSERT INTO login_otps (
+      user_id,
+      otp,
+      expires_at
+    )
+    VALUES ($1, $2, $3)
+    `,
     [userId, otp, expiresAt]
   );
 };
 
 exports.getLatestOtp = async (userId) => {
   const result = await pool.query(
-    `SELECT *
-     FROM login_otps
-     WHERE user_id = $1
-     ORDER BY created_at DESC
-     LIMIT 1`,
+    `
+    SELECT *
+    FROM login_otps
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
     [userId]
   );
 
@@ -134,8 +238,10 @@ exports.getLatestOtp = async (userId) => {
 
 exports.deleteOtp = async (userId) => {
   await pool.query(
-    `DELETE FROM login_otps
-     WHERE user_id = $1`,
+    `
+    DELETE FROM login_otps
+    WHERE user_id = $1
+    `,
     [userId]
   );
 };
