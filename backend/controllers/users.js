@@ -1,4 +1,7 @@
 const User = require("../models/User");
+const calculateLevel = (xp) => {
+  return Math.floor(xp / 500) + 1;
+};
 
 exports.getProfile = async (req, res) => {
   try {
@@ -11,13 +14,11 @@ exports.getProfile = async (req, res) => {
       });
     }
 
-    const level = Math.floor(user.xp / 100) + 1;
-
     return res.status(200).json({
       success: true,
       user: {
         ...user,
-        level
+        level: calculateLevel(user.xp)
       }
     });
   } catch (error) {
@@ -43,13 +44,11 @@ exports.getUserById = async (req, res) => {
       });
     }
 
-    const level = Math.floor(user.xp / 100) + 1;
-
     return res.status(200).json({
       success: true,
       user: {
         ...user,
-        level
+        level: calculateLevel(user.xp)
       }
     });
   } catch (error) {
@@ -68,7 +67,7 @@ exports.getAllUsers = async (req, res) => {
 
     const formattedUsers = users.map((user) => ({
       ...user,
-      level: Math.floor(user.xp / 100) + 1
+      level: calculateLevel(user.xp)
     }));
 
     return res.status(200).json({
@@ -108,7 +107,10 @@ exports.updateProfile = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      user: updatedUser
+      user: {
+        ...updatedUser,
+        level: calculateLevel(updatedUser.xp)
+      }
     });
   } catch (error) {
     console.error(error);
@@ -130,14 +132,12 @@ exports.updateScore = async (req, res) => {
       xp
     );
 
-    const level = Math.floor(user.xp / 100) + 1;
-
     return res.status(200).json({
       success: true,
       message: "Score updated successfully",
       user: {
         ...user,
-        level
+        level: calculateLevel(user.xp)
       }
     });
   } catch (error) {
