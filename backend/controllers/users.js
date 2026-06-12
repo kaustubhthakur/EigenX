@@ -1,4 +1,5 @@
 const User = require("../models/User");
+
 const calculateLevel = (xp) => {
   return Math.floor(xp / 500) + 1;
 };
@@ -96,7 +97,6 @@ exports.updateProfile = async (req, res) => {
         avatar
       }
     );
-
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
