@@ -10,18 +10,12 @@ const {
   updateProfile,
   updateOnlineStatus,
   updateScore
-} = require("../controllers/userController");
+} = require("../controllers/users");
 
-router.get("/me", verifyToken, getProfile);
-
+router.get("/Profike", verifyToken, getProfile);
 router.get("/", getAllUsers);
-
 router.get("/:id", getUserById);
-
-router.put("/profile", verifyToken, updateProfile);
-
+router.put("/:profile", verifyToken, updateProfile);
 router.put("/online-status", verifyToken, updateOnlineStatus);
-
 router.put("/score", verifyToken, updateScore);
-
 module.exports = router;
