@@ -7,7 +7,7 @@ const verifyToken =
 
 const {
   getLeaderboard
-} = require("../controllers/dashboardController");
+} = require("../controllers/dashboard");
 
 router.get(
   "/leaderboard",
