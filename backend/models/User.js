@@ -42,6 +42,29 @@ exports.createUser = async ({
   return result.rows[0];
 };
 
+exports.getUserWithLevel = async (id) => {
+  const result = await pool.query(
+    `
+    SELECT
+      id,
+      username,
+      email,
+      avatar,
+      is_online,
+      last_seen,
+      top_score,
+      xp,
+      FLOOR(xp / 100) + 1 AS level,
+      created_at
+    FROM users
+    WHERE id = $1
+    `,
+    [id]
+  );
+
+  return result.rows[0];
+};
+
 exports.findUserByEmail = async (email) => {
   const result = await pool.query(
     `
