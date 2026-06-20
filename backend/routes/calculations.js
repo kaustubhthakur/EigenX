@@ -5,7 +5,6 @@ router.get(
   "/",
   calculationController.getAllCalculations
 );
-
 router.get(
   "/level/:level",
   calculationController.getCalculationsByLevel

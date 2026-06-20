@@ -19,7 +19,6 @@ router.put(
   verifyToken,
   friendController.acceptFriendRequest
 );
-
 router.get(
   "/",
   verifyToken,
