@@ -4,9 +4,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const { Server } = require("socket.io");
-
 const pool = require("./db");
-
 const authrouter = require("./routes/auth");
 const userrouter = require("./routes/users")
 const dashboardrouter = require('./routes/dashboard')
