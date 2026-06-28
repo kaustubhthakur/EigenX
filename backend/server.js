@@ -9,13 +9,10 @@ const authrouter = require("./routes/auth");
 const userrouter = require("./routes/users")
 const dashboardrouter = require('./routes/dashboard')
 const PORT = process.env.PORT || 8081;
-
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
-
 app.use("/auth", authrouter);
 app.use("/users",userrouter)
 app.use("/dashboard",dashboardrouter)
@@ -35,21 +32,17 @@ app.get("/health", async (req, res) => {
     });
   }
 });
-
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: "*",
     credentials: true
   }
 });
-
 io.on("connection", async (socket) => {
   console.log("User connected");
 
   const userId = socket.handshake.auth.userId;
-
   if (userId) {
     await pool.query(
       `
