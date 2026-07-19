@@ -50,6 +50,7 @@ io.on("connection", async (socket) => {
       SET is_online = true
       WHERE id = $1
       `,
+      
       [userId]
     );
   }
