@@ -7,8 +7,10 @@ import type {
   VerifyOtpPayload,
   VerifyOtpResponse,
 } from "../types/auth";
+import type { UserProfile, ProfileResponse, UpdateScorePayload } from "../types/user";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/auth";
+const USERS_API_URL = process.env.NEXT_PUBLIC_USERS_API_URL || "http://localhost:8081/users";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -16,14 +18,15 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+// generalized to accept a base, so it works for both /auth and /users routers
+async function request<T>(base: string, path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await fetch(`${base}${path}`, {
     method: options.method || "GET",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
-    credentials: "include", // required so the httpOnly access_token cookie is sent/stored
+    credentials: "include",
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
@@ -35,29 +38,55 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!res.ok) {
-    const message = (data as ApiErrorBody | null)?.error || "Something went wrong. Please try again.";
+    const body = data as (ApiErrorBody & { message?: string }) | null;
+    const message = body?.error || body?.message || "Something went wrong. Please try again.";
     throw new Error(message);
   }
 
   return data as T;
 }
 
-// POST /register -> { username, email, password }
+// ----- auth (unchanged behavior, now routed through the generalized request) -----
+
 export function registerUser(payload: RegisterPayload): Promise<RegisterResponse> {
-  return request<RegisterResponse>("/register", { method: "POST", body: payload });
+  return request<RegisterResponse>(API_URL, "/register", { method: "POST", body: payload });
 }
 
-// POST /login -> { email, password } => triggers OTP email, returns { userId }
 export function loginUser(payload: LoginPayload): Promise<LoginResponse> {
-  return request<LoginResponse>("/login", { method: "POST", body: payload });
+  return request<LoginResponse>(API_URL, "/login", { method: "POST", body: payload });
 }
 
-// POST /verifyOtp -> { userId, otp } => sets access_token cookie, returns user + token
 export function verifyOtp(payload: VerifyOtpPayload): Promise<VerifyOtpResponse> {
-  return request<VerifyOtpResponse>("/verifyOtp", { method: "POST", body: payload });
+  return request<VerifyOtpResponse>(API_URL, "/verifyOtp", { method: "POST", body: payload });
 }
 
-// POST /logout -> clears access_token cookie
 export function logoutUser(): Promise<{ message: string }> {
-  return request<{ message: string }>("/logout", { method: "POST" });
+  return request<{ message: string }>(API_URL, "/logout", { method: "POST" });
+}
+
+// ----- users -----
+
+// GET /users/Profile -> current authenticated user (via cookie)
+export function getProfile(): Promise<ProfileResponse> {
+  return request<ProfileResponse>(USERS_API_URL, "/Profile");
+}
+
+// GET /users/:id -> public profile lookup
+export function getUserById(id: string): Promise<ProfileResponse> {
+  return request<ProfileResponse>(USERS_API_URL, `/${id}`);
+}
+
+// GET /users -> leaderboard / all users
+export function getAllUsers(): Promise<{ success: boolean; count: number; users: UserProfile[] }> {
+  return request(USERS_API_URL, "/");
+}
+
+// PUT /users/profile -> update username/avatar
+export function updateProfile(payload: { username?: string; avatar?: string }): Promise<ProfileResponse> {
+  return request<ProfileResponse>(USERS_API_URL, "/profile", { method: "PUT", body: payload });
+}
+
+// PUT /users/score -> update score/xp
+export function updateScore(payload: UpdateScorePayload): Promise<ProfileResponse> {
+  return request<ProfileResponse>(USERS_API_URL, "/score", { method: "PUT", body: payload });
 }
