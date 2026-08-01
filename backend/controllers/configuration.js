@@ -39,3 +39,12 @@ exports.startGame = async (req, res) => {
     });
   }
 };
+
+exports.getConfigurations = async (req, res) => {
+  try {
+    const configs = await Configuration.getAllConfigurations();
+    return res.status(200).json({ success: true, configurations: configs });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};

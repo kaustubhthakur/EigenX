@@ -173,11 +173,18 @@ exports.submitAnswer = async (req, res) => {
 
     }
 
-    const current = await Game.getCurrentQuestion(
-      session.id
-    );
+ const current = await Game.getCurrentQuestion(
+  session.id
+);
 
-    let score = session.score;
+if (!current) {
+  return res.status(409).json({
+    success: false,
+    message: "No active question for this session — fetch a question first"
+  });
+}
+
+let score = session.score;
 
     let correct = false;
 

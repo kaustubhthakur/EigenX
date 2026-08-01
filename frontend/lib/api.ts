@@ -13,6 +13,8 @@ import type { FriendsResponse, PendingRequestsResponse } from "../types/friend";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/auth";
 const USERS_API_URL = process.env.NEXT_PUBLIC_USERS_API_URL || "http://localhost:8081/users";
 const FRIENDS_API_URL = process.env.NEXT_PUBLIC_FRIENDS_API_URL || "http://localhost:8081/friends";
+const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || "http://localhost:8081/configuration";
+const GAME_API_URL = process.env.NEXT_PUBLIC_GAME_API_URL || "http://localhost:8081/game";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -144,4 +146,66 @@ export function getPendingRequests(): Promise<PendingRequestsResponse> {
 
 export function removeFriend(friendId: string): Promise<{ success: boolean; message: string }> {
   return request(FRIENDS_API_URL, `/${friendId}`, { method: "DELETE" });
+}
+
+export interface GameConfiguration {
+  id: string;
+  level: number;
+  timer: number;
+}
+
+export interface StartGameResponse {
+  success: boolean;
+  message: string;
+  sessionId: string;
+}
+
+
+export async function getConfigurations(): Promise<GameConfiguration[]> {
+  try {
+    const res = await request<{ success: boolean; configurations: GameConfiguration[] }>(
+      CONFIG_API_URL,
+      "/"
+    );
+    return res.configurations;
+  } catch {
+    return [1, 2, 3].flatMap((level) =>
+      [30, 60, 90].map((timer, i) => ({ id: `fallback-${level}-${timer}`, level, timer }))
+    );
+  }
+}
+
+
+export function startGame(payload: { level: number; timer: number }): Promise<StartGameResponse> {
+  return request<StartGameResponse>(CONFIG_API_URL, "/start", { method: "POST", body: payload });
+}
+
+
+export interface QuestionResponse {
+  success: boolean;
+  gameOver?: boolean;
+  score: number;
+  remainingTime?: number;
+  question?: string;
+}
+
+export interface AnswerResponse {
+  success: boolean;
+  gameOver?: boolean;
+  correct?: boolean;
+  score: number;
+  nextQuestion?: boolean;
+}
+
+
+export function getQuestion(sessionId: string): Promise<QuestionResponse> {
+  return request<QuestionResponse>(GAME_API_URL, `/question/${sessionId}`);
+}
+
+
+export function submitAnswer(sessionId: string, answer: number): Promise<AnswerResponse> {
+  return request<AnswerResponse>(GAME_API_URL, "/answer", {
+    method: "POST",
+    body: { sessionId, answer },
+  });
 }
