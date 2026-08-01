@@ -57,7 +57,12 @@ export default function Navbar() {
               >
                 Profile
               </Link>
-
+<Link
+  href="/leaderboard"
+  className="rounded-lg px-3 py-1.5 font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+>
+  Leaderboard
+</Link>
               <Link
                 href="/dashboard"
                 className="ml-1 flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-gray-100"

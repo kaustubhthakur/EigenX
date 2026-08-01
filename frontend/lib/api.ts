@@ -15,6 +15,7 @@ const USERS_API_URL = process.env.NEXT_PUBLIC_USERS_API_URL || "http://localhost
 const FRIENDS_API_URL = process.env.NEXT_PUBLIC_FRIENDS_API_URL || "http://localhost:8081/friends";
 const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || "http://localhost:8081/configuration";
 const GAME_API_URL = process.env.NEXT_PUBLIC_GAME_API_URL || "http://localhost:8081/game";
+const DASHBOARD_API_URL = process.env.NEXT_PUBLIC_DASHBOARD_API_URL || "http://localhost:8081/dashboard";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -208,4 +209,26 @@ export function submitAnswer(sessionId: string, answer: number): Promise<AnswerR
     method: "POST",
     body: { sessionId, answer },
   });
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  id: string;
+  username: string;
+  avatar: string | null;
+  xp: number;
+  level: number;
+  top_score: number;
+  top_score_at: string | null;
+  difficulty_level: number | null;
+  is_online: boolean;
+}
+export interface LeaderboardResponse {
+  success: boolean;
+  count: number;
+  leaderboard: LeaderboardEntry[];
+}
+
+export function getLeaderboard(): Promise<LeaderboardResponse> {
+  return request<LeaderboardResponse>(DASHBOARD_API_URL, "/leaderboard");
 }
