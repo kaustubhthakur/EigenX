@@ -3,7 +3,29 @@ const User = require("../models/User");
 const calculateLevel = (xp) => {
   return Math.floor(xp / 500) + 1;
 };
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file uploaded" });
+    }
 
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const updatedUser = await User.updateUser(req.user.id, { avatar: avatarUrl });
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Avatar uploaded successfully",
+      user: { ...updatedUser, level: calculateLevel(updatedUser.xp) },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: "Failed to upload avatar" });
+  }
+};
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.getUser(req.user.id);

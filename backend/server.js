@@ -13,6 +13,8 @@ const configurationrouter = require('./routes/configuration')
 const gamerouter = require('./routes/game')
 const PORT = process.env.PORT || 8081;
 const app = express();
+const path = require("path");
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
