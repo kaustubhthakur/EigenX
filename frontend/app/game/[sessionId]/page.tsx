@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getQuestion, submitAnswer } from "../../../lib/api";
 
 type Phase = "loading" | "playing" | "gameover" | "error";
 
-export default function GameSessionPage({ params }: { params: { sessionId: string } }) {
-  const { sessionId } = params;
+export default function GameSessionPage({
+  params,
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
+  const { sessionId } = use(params);
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("loading");
