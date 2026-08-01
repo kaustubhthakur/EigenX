@@ -81,7 +81,7 @@ export default function AvatarUpload({ currentAvatar, username, onUploaded }: Av
         }`}
       >
         {displaySrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
+    
           <img src={displaySrc} alt={username} className="h-full w-full object-cover" />
         ) : (
           <span className="text-2xl font-semibold text-indigo-600">

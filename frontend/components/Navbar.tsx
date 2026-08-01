@@ -16,7 +16,6 @@ export default function Navbar() {
     try {
       await logoutUser();
     } catch {
-      // even if the request fails, clear local state so the UI doesn't hang
     } finally {
       logoutLocal();
       setLoggingOut(false);
@@ -45,8 +44,7 @@ export default function Navbar() {
           </Link>
 
           {loading ? (
-            // Auth state is still being resolved against the httpOnly cookie —
-            // show a neutral placeholder instead of guessing logged-in/out.
+
             <div className="ml-1 flex items-center gap-2">
               <div className="h-8 w-20 animate-pulse rounded-lg bg-gray-100" />
               <div className="h-8 w-16 animate-pulse rounded-lg bg-gray-100" />

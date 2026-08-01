@@ -8,7 +8,7 @@ export interface Friend {
 }
 
 export interface PendingRequest {
-  id: string;        // friend_request id, used to accept
+  id: string;       
   sender_id: string;
   username: string;
   avatar?: string;
