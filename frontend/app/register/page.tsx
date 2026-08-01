@@ -38,6 +38,7 @@ export default function RegisterPage() {
   };
 
   return (
+    <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center px-4 py-10">
     <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
       <h1 className="text-xl font-semibold mb-1">Create an account</h1>
       <p className="text-sm text-gray-500 mb-6">Sign up to get started</p>
@@ -81,6 +82,7 @@ export default function RegisterPage() {
           Log in
         </Link>
       </p>
+    </div>
     </div>
   );
 }
