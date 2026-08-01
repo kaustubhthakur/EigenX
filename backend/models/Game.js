@@ -96,6 +96,19 @@ exports.getCurrentQuestion = async (sessionId) => {
   return result.rows[0];
 };
 
+exports.updateScore = async (sessionId, score) => {
+  const result = await pool.query(
+    `
+    UPDATE game_sessions
+    SET score = $2
+    WHERE id = $1
+    RETURNING *
+    `,
+    [sessionId, score]
+  );
+
+  return result.rows[0];
+};
 exports.updateTopScore = async (userId, score) => {
   const result = await pool.query(
     `
@@ -115,7 +128,6 @@ exports.updateTopScore = async (userId, score) => {
 
   return result.rows[0];
 };
-
 exports.finishGame = async (sessionId) => {
   const result = await pool.query(
     `
