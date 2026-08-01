@@ -49,7 +49,13 @@ async function request<T>(base: string, path: string, options: RequestOptions = 
 }
 
 
+export const ASSET_BASE_URL = USERS_API_URL.replace(/\/users$/, "");
 
+export function resolveAvatarUrl(avatar?: string | null): string | undefined {
+  if (!avatar) return undefined;
+  if (avatar.startsWith("http://") || avatar.startsWith("https://")) return avatar;
+  return `${ASSET_BASE_URL}${avatar}`;
+}
 export function registerUser(payload: RegisterPayload): Promise<RegisterResponse> {
   return request<RegisterResponse>(API_URL, "/register", { method: "POST", body: payload });
 }

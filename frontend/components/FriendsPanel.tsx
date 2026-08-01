@@ -8,6 +8,7 @@ import {
   acceptFriendRequest,
   removeFriend,
   getAllUsers,
+  resolveAvatarUrl,
 } from "../lib/api";
 import type { Friend, PendingRequest } from "../types/friend";
 import type { UserProfile } from "../types/user";
@@ -145,8 +146,8 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                     <div className="relative">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                         {f.avatar ? (
-  
-                          <img src={f.avatar} alt={f.username} className="h-full w-full object-cover" />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={resolveAvatarUrl(f.avatar)} alt={f.username} className="h-full w-full object-cover" />
                         ) : (
                           f.username[0]?.toUpperCase()
                         )}
@@ -188,8 +189,8 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                       {r.avatar ? (
-
-                        <img src={r.avatar} alt={r.username} className="h-full w-full object-cover" />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={resolveAvatarUrl(r.avatar)} alt={r.username} className="h-full w-full object-cover" />
                       ) : (
                         r.username[0]?.toUpperCase()
                       )}
@@ -228,7 +229,7 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                         {u.avatar ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={u.avatar} alt={u.username} className="h-full w-full object-cover" />
+                          <img src={resolveAvatarUrl(u.avatar)} alt={u.username} className="h-full w-full object-cover" />
                         ) : (
                           u.username[0]?.toUpperCase()
                         )}

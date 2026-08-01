@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { uploadAvatar } from "../lib/api";
+import { uploadAvatar, resolveAvatarUrl } from "../lib/api";
 import type { UserProfile } from "../types/user";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -61,7 +61,9 @@ export default function AvatarUpload({ currentAvatar, username, onUploaded }: Av
     if (file) handleFile(file);
   };
 
-  const displaySrc = preview || currentAvatar;
+  // preview = local blob URL right after picking a file (instant feedback)
+  // resolveAvatarUrl(currentAvatar) = the saved avatar, resolved to the backend's full URL
+  const displaySrc = preview || resolveAvatarUrl(currentAvatar);
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -81,7 +83,7 @@ export default function AvatarUpload({ currentAvatar, username, onUploaded }: Av
         }`}
       >
         {displaySrc ? (
-    
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={displaySrc} alt={username} className="h-full w-full object-cover" />
         ) : (
           <span className="text-2xl font-semibold text-indigo-600">
