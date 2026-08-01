@@ -44,26 +44,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mt-20 grid gap-6 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-900">Password hashing</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Passwords are hashed with bcrypt before they ever touch the database.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-900">Email OTP</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            A 6-digit code, valid for 5 minutes, confirms every login attempt.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-900">HttpOnly sessions</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Sessions are stored in an httpOnly, sameSite cookie — never exposed to JS.
-          </p>
-        </div>
-      </section>
+    
     </div>
   );
 }

@@ -25,38 +25,65 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur">
-      <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link href="/" className="text-lg font-semibold text-gray-900">
-          EigenX
+    <header className="sticky top-0 z-10 border-b border-gray-200/80 bg-white/80 backdrop-blur-md">
+      <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
+        <Link href="/" className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-600 to-indigo-400 text-sm font-bold text-white shadow-sm">
+            X
+          </span>
+          <span className="text-lg font-semibold tracking-tight text-gray-900">
+            EigenX
+          </span>
         </Link>
 
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/" className="text-gray-600 hover:text-gray-900">
+        <div className="flex items-center gap-1 text-sm sm:gap-2">
+          <Link
+            href="/"
+            className="rounded-lg px-3 py-1.5 font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+          >
             Home
           </Link>
 
           {user ? (
             <>
-              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+              <Link
+                href="/dashboard"
+                className="rounded-lg px-3 py-1.5 font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+              >
                 Dashboard
               </Link>
+
+              <Link
+                href="/dashboard"
+                className="ml-1 flex items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-gray-100"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                  {user.username?.[0]?.toUpperCase() || "?"}
+                </span>
+                <span className="hidden font-medium text-gray-900 sm:inline">
+                  {user.username}
+                </span>
+              </Link>
+
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="ml-1 rounded-lg bg-indigo-600 px-3.5 py-1.5 font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
               >
                 {loggingOut ? "Logging out..." : "Log out"}
               </button>
             </>
           ) : (
             <>
-              <Link href="/login" className="text-gray-600 hover:text-gray-900">
+              <Link
+                href="/login"
+                className="rounded-lg px-3 py-1.5 font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
+              >
                 Log in
               </Link>
               <Link
                 href="/register"
-                className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700"
+                className="ml-1 rounded-lg bg-indigo-600 px-3.5 py-1.5 font-semibold text-white shadow-sm transition hover:bg-indigo-700"
               >
                 Sign up
               </Link>

@@ -1,18 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Force light color scheme so browsers don't silently auto-invert
-   (Chrome's "Auto Dark Mode" darkens undeclared pages and can wash
-   out text contrast, especially over white cards). */
 :root {
   color-scheme: light;
 }
 
 html {
   scroll-behavior: smooth;
-}
-
-body {
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
