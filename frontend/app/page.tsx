@@ -60,16 +60,6 @@ export default function HomePage() {
       {/* Hero */}
       <section className="border-b border-gray-100 bg-gradient-to-b from-indigo-50 to-white px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-            Sharpen your reflexes with{" "}
-            <span className="bg-gradient-to-br from-indigo-600 to-indigo-400 bg-clip-text text-transparent">
-              EigenX
-            </span>
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-gray-500">
-            Pick a level, race the clock, climb the leaderboard, and challenge your friends.
-          </p>
-
           {!authLoading && !user && (
             <div className="mt-8 flex justify-center gap-3">
               <Link
