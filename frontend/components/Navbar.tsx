@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { logoutUser } from "../lib/api";
 
 export default function Navbar() {
-  const { user, logoutLocal } = useAuth();
+  const { user, loading, logoutLocal } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -44,13 +44,20 @@ export default function Navbar() {
             Home
           </Link>
 
-          {user ? (
+          {loading ? (
+            // Auth state is still being resolved against the httpOnly cookie —
+            // show a neutral placeholder instead of guessing logged-in/out.
+            <div className="ml-1 flex items-center gap-2">
+              <div className="h-8 w-20 animate-pulse rounded-lg bg-gray-100" />
+              <div className="h-8 w-16 animate-pulse rounded-lg bg-gray-100" />
+            </div>
+          ) : user ? (
             <>
               <Link
                 href="/dashboard"
                 className="rounded-lg px-3 py-1.5 font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
               >
-                Dashboard
+                Profile
               </Link>
 
               <Link
