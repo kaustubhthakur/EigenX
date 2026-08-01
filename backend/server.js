@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 const pool = require("./db");
 const authrouter = require("./routes/auth");
 const userrouter = require("./routes/users")
+const friendsrouter = require("./routes/friends");
 const dashboardrouter = require('./routes/dashboard')
 const configurationrouter = require('./routes/configuration')
 const gamerouter = require('./routes/game')
@@ -25,6 +26,7 @@ app.use("/users",userrouter)
 app.use("/dashboard",dashboardrouter)
 app.use("/configuration",configurationrouter)
 app.use("/game",gamerouter)
+app.use("/friends", friendsrouter);
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
