@@ -57,7 +57,7 @@ export default function HomePage() {
 
   return (
     <main>
-      {/* Hero */}
+    
       <section className="border-b border-gray-100 bg-gradient-to-b from-indigo-50 to-white px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
           {!authLoading && !user && (
@@ -79,7 +79,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Start game panel */}
+  
       <section className="px-4 py-14 sm:px-6">
         <div className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Start a game</h2>
