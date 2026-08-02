@@ -153,6 +153,12 @@ export default function LeaderboardPage() {
                         {isMe && (
                           <p className="text-[10px] font-medium text-[#9EA1E8]">You</p>
                         )}
+                        <p className="mt-0.5 text-[10px] text-[#71758A]">
+                          Level {entry.level}
+                          {entry.top_score_at && (
+                            <> · {new Date(entry.top_score_at).toLocaleDateString()}</>
+                          )}
+                        </p>
                       </div>
 
                       <p className={`${display.className} text-sm font-bold text-[#F4F4F6] sm:text-base`}>
