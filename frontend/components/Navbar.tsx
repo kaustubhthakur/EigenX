@@ -36,7 +36,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-10 border-b border-[#22242E] bg-[#0B0C10]/85 backdrop-blur-xl">
-      {/* faint CRT scanline texture — decorative only */}
+    
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
@@ -45,7 +45,7 @@ export default function Navbar() {
         }}
         aria-hidden="true"
       />
-      {/* bottom glow line */}
+     
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#5B5FEF]/60 to-transparent" />
 
       <nav className="relative mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
