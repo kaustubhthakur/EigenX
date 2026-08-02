@@ -1,8 +1,5 @@
 const pool = require("../db");
 
-// Attempts to atomically claim a waiting opponent for this user. Uses a
-// transaction + FOR UPDATE SKIP LOCKED so two players joining at the same
-// moment can't both match the same waiting queue entry.
 exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
   const client = await pool.connect();
   try {
@@ -78,7 +75,7 @@ exports.leaveQueue = async (userId) => {
   );
 };
 
-// Called by whoever queued first, to find out if someone has since matched them.
+
 exports.getQueueStatus = async (userId) => {
   const result = await pool.query(
     `
@@ -111,7 +108,7 @@ exports.getDuel = async (duelId) => {
   return result.rows[0];
 };
 
-// Sets a new shared question for the round and resets both players' "answered" flags.
+
 exports.saveCurrentQuestion = async (duelId, question, answer) => {
   const result = await pool.query(
     `
@@ -130,7 +127,7 @@ exports.saveCurrentQuestion = async (duelId, question, answer) => {
   return result.rows[0];
 };
 
-// Clears the round so the next getQuestion call mints a fresh one for both players.
+
 exports.clearCurrentQuestion = async (duelId) => {
   const result = await pool.query(
     `
@@ -202,9 +199,7 @@ exports.finishDuel = async (duelId) => {
   return result.rows[0];
 };
 
-// ASSUMPTION: friends(id, requester_id, receiver_id, status, created_at) with
-// status = 'accepted' once a friend request has been accepted. Adjust if your
-// actual friends table is shaped differently.
+
 exports.areFriends = async (userId1, userId2) => {
   const result = await pool.query(
     `
@@ -223,7 +218,7 @@ exports.areFriends = async (userId1, userId2) => {
   return result.rows.length > 0;
 };
 
-// Plain (non-queue) duel creation, used once a challenge is accepted.
+
 exports.createDuel = async (player1Id, player2Id, configurationId) => {
   const result = await pool.query(
     `
@@ -275,7 +270,6 @@ exports.getChallenge = async (challengeId) => {
   return result.rows[0];
 };
 
-// Incoming pending challenges for a user, with the challenger's basic info attached.
 exports.getIncomingChallenges = async (userId) => {
   const result = await pool.query(
     `

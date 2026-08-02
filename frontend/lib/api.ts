@@ -9,6 +9,14 @@ import type {
 } from "../types/auth";
 import type { UserProfile, ProfileResponse, UpdateScorePayload } from "../types/user";
 import type { FriendsResponse, PendingRequestsResponse } from "../types/friend";
+import type {
+  JoinDuelResponse,
+  DuelStatusResponse,
+  DuelQuestionResponse,
+  DuelAnswerResponse,
+  ChallengeResponse,
+  IncomingChallengesResponse,
+} from "../types/duel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/auth";
 const USERS_API_URL = process.env.NEXT_PUBLIC_USERS_API_URL || "http://localhost:8081/users";
@@ -16,6 +24,7 @@ const FRIENDS_API_URL = process.env.NEXT_PUBLIC_FRIENDS_API_URL || "http://local
 const CONFIG_API_URL = process.env.NEXT_PUBLIC_CONFIG_API_URL || "http://localhost:8081/configuration";
 const GAME_API_URL = process.env.NEXT_PUBLIC_GAME_API_URL || "http://localhost:8081/game";
 const DASHBOARD_API_URL = process.env.NEXT_PUBLIC_DASHBOARD_API_URL || "http://localhost:8081/dashboard";
+const DUEL_API_URL = process.env.NEXT_PUBLIC_DUEL_API_URL || "http://localhost:8081/duel";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -231,4 +240,66 @@ export interface LeaderboardResponse {
 
 export function getLeaderboard(): Promise<LeaderboardResponse> {
   return request<LeaderboardResponse>(DASHBOARD_API_URL, "/leaderboard");
+}
+
+// --- Duels: quick-match queue ---
+
+export function joinDuel(configurationId: string): Promise<JoinDuelResponse> {
+  return request<JoinDuelResponse>(DUEL_API_URL, "/join", {
+    method: "POST",
+    body: { configurationId },
+  });
+}
+
+export function getDuelStatus(): Promise<DuelStatusResponse> {
+  return request<DuelStatusResponse>(DUEL_API_URL, "/status");
+}
+
+export function leaveDuelQueue(): Promise<{ success: boolean; message: string }> {
+  return request(DUEL_API_URL, "/queue", { method: "DELETE" });
+}
+
+// --- Duels: friend challenges ---
+
+export function challengeFriend(
+  friendId: string,
+  configurationId: string
+): Promise<ChallengeResponse> {
+  return request<ChallengeResponse>(DUEL_API_URL, "/challenge", {
+    method: "POST",
+    body: { friendId, configurationId },
+  });
+}
+
+export function getIncomingChallenges(): Promise<IncomingChallengesResponse> {
+  return request<IncomingChallengesResponse>(DUEL_API_URL, "/challenges");
+}
+
+export function respondToChallenge(
+  challengeId: string,
+  accept: boolean
+): Promise<ChallengeResponse> {
+  return request<ChallengeResponse>(DUEL_API_URL, `/challenges/${challengeId}/respond`, {
+    method: "POST",
+    body: { accept },
+  });
+}
+
+export function cancelChallenge(challengeId: string): Promise<ChallengeResponse> {
+  return request<ChallengeResponse>(DUEL_API_URL, `/challenges/${challengeId}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Duels: gameplay ---
+
+export function getDuelQuestion(duelId: string): Promise<DuelQuestionResponse> {
+  return request<DuelQuestionResponse>(DUEL_API_URL, `/question/${duelId}`);
+}
+
+export function submitDuelAnswer(duelId: string, answer: number): Promise<DuelAnswerResponse> {
+  return request<DuelAnswerResponse>(DUEL_API_URL, "/answer", {
+    method: "POST",
+    body: { duelId, answer },
+  });
 }
