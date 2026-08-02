@@ -85,7 +85,7 @@ export default function DuelRoomPage() {
       .catch(() => setOpponent({ id: opponentId, username: "Opponent", avatar: null }));
   }, [opponentId]);
 
-  // Poll for the current question / scores / clock.
+
   useEffect(() => {
     if (!duelId || !duelMeta) return;
 
@@ -120,7 +120,7 @@ export default function DuelRoomPage() {
           setAnswerInput("");
         }
       } catch {
-        // transient network hiccup — next poll will retry
+  
       }
     };
 
@@ -131,7 +131,7 @@ export default function DuelRoomPage() {
     };
   }, [duelId, duelMeta, isPlayer1]);
 
-  // Smooth client-side countdown between polls.
+ 
   useEffect(() => {
     if (gameOver) return;
     tickRef.current = setInterval(() => {
@@ -294,7 +294,7 @@ export default function DuelRoomPage() {
           </button>
         </div>
 
-        {answered && (
+        {/* {answered && (
           <p
             className={`mt-4 text-sm font-medium ${
               lastResult === "correct" ? "text-emerald-600" : "text-red-500"
@@ -303,7 +303,7 @@ export default function DuelRoomPage() {
             {lastResult === "correct" ? "Correct!" : "Not quite."}{" "}
             {opponentAnswered ? "Next question incoming…" : "Waiting for your opponent…"}
           </p>
-        )}
+        )} */}
       </div>
     </div>
   );

@@ -7,18 +7,14 @@ import {
   challengeFriend,
   getConfigurations,
   getFriends,
-  getIncomingChallenges,
   joinDuel,
   leaveDuelQueue,
   getDuelStatus,
-  respondToChallenge,
   resolveAvatarUrl,
   type GameConfiguration,
 } from "../../lib/api";
-import type { IncomingChallenge } from "../../types/duel";
 
-// The FriendsResponse type doesn't ship a public shape in this codebase's
-// types/friend module, so we keep this local and defensive.
+
 interface FriendLite {
   id: string;
   username: string;
@@ -26,14 +22,14 @@ interface FriendLite {
   is_online?: boolean;
 }
 
-type Tab = "quick" | "challenge" | "incoming";
+type Tab = "quick" | "challenge";
 
 function storeDuel(duel: unknown) {
   try {
     const d = duel as { id: string };
     sessionStorage.setItem(`duel:${d.id}`, JSON.stringify(duel));
   } catch {
-    // sessionStorage unavailable — the duel page will fall back to polling
+  
   }
 }
 
@@ -58,10 +54,6 @@ export default function DuelLobbyPage() {
   const [challengeConfigId, setChallengeConfigId] = useState<string | null>(null);
   const [sendingChallenge, setSendingChallenge] = useState(false);
   const [challengeFeedback, setChallengeFeedback] = useState<string | null>(null);
-
-  const [incoming, setIncoming] = useState<IncomingChallenge[]>([]);
-  const [incomingLoading, setIncomingLoading] = useState(true);
-  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -93,19 +85,6 @@ export default function DuelLobbyPage() {
       .finally(() => setFriendsLoading(false));
   }, [tab]);
 
-  const refreshIncoming = useCallback(() => {
-    getIncomingChallenges()
-      .then((res) => setIncoming(res.challenges))
-      .catch(() => {})
-      .finally(() => setIncomingLoading(false));
-  }, []);
-
-  useEffect(() => {
-    refreshIncoming();
-    const id = setInterval(refreshIncoming, 4000);
-    return () => clearInterval(id);
-  }, [refreshIncoming]);
-
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -136,7 +115,7 @@ export default function DuelLobbyPage() {
             router.push(`/duel/${status.duel.id}`);
           }
         } catch {
-          // keep polling — a transient error shouldn't drop the search
+          
         }
       }, 2500);
     } catch (err) {
@@ -152,7 +131,7 @@ export default function DuelLobbyPage() {
     try {
       await leaveDuelQueue();
     } catch {
-      // already left or never fully joined — safe to ignore
+     
     }
   };
 
@@ -167,22 +146,6 @@ export default function DuelLobbyPage() {
       setChallengeFeedback(err instanceof Error ? err.message : "Couldn't send the challenge");
     } finally {
       setSendingChallenge(false);
-    }
-  };
-
-  const handleRespond = async (challengeId: string, accept: boolean) => {
-    setRespondingId(challengeId);
-    try {
-      const res = await respondToChallenge(challengeId, accept);
-      setIncoming((prev) => prev.filter((c) => c.id !== challengeId));
-      if (accept && res.duel) {
-        storeDuel(res.duel);
-        router.push(`/duel/${res.duel.id}`);
-      }
-    } catch {
-      // leave the challenge in the list so the person can retry
-    } finally {
-      setRespondingId(null);
     }
   };
 
@@ -205,7 +168,6 @@ export default function DuelLobbyPage() {
         {([
           ["quick", "Quick match"],
           ["challenge", "Challenge a friend"],
-          ["incoming", `Incoming${incoming.length ? ` (${incoming.length})` : ""}`],
         ] as [Tab, string][]).map(([value, label]) => (
           <button
             key={value}
@@ -309,7 +271,7 @@ export default function DuelLobbyPage() {
                   >
                     <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
                       {friend.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                      
                         <img
                           src={resolveAvatarUrl(friend.avatar)}
                           alt=""
@@ -358,68 +320,6 @@ export default function DuelLobbyPage() {
                 {sendingChallenge ? "Sending…" : "Send challenge"}
               </button>
             </>
-          )}
-        </section>
-      )}
-
-      {tab === "incoming" && (
-        <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          {incomingLoading ? (
-            <div className="space-y-2">
-              {[0, 1].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />
-              ))}
-            </div>
-          ) : incoming.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-500">No pending challenges.</p>
-          ) : (
-            <ul className="space-y-2">
-              {incoming.map((challenge) => {
-                const cfg = configurations.find((c) => c.id === challenge.configuration_id);
-                return (
-                  <li
-                    key={challenge.id}
-                    className="flex items-center gap-3 rounded-xl border border-gray-200 px-3 py-3"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
-                      {challenge.challenger_avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={resolveAvatarUrl(challenge.challenger_avatar)}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        challenge.challenger_username?.[0]?.toUpperCase() || "?"
-                      )}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {challenge.challenger_username}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Level {challenge.challenger_level}
-                        {cfg ? ` · ${cfg.level} diff · ${cfg.timer}s` : ""}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleRespond(challenge.id, true)}
-                      disabled={respondingId === challenge.id}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => handleRespond(challenge.id, false)}
-                      disabled={respondingId === challenge.id}
-                      className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60"
-                    >
-                      Decline
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
           )}
         </section>
       )}
