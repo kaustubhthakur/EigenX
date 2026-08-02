@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getLeaderboard, resolveAvatarUrl, type LeaderboardEntry } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 type Phase = "loading" | "loaded" | "error";
 
-const rankStyles: Record<number, string> = {
-  1: "bg-yellow-100 text-yellow-700 border-yellow-300",
-  2: "bg-gray-100 text-gray-700 border-gray-300",
-  3: "bg-orange-100 text-orange-700 border-orange-300",
+// Rank 1/2/3 get a medal ring + glow. Everyone else gets a plain numbered slot.
+const medal: Record<number, { ring: string; glow: string; text: string; label: string }> = {
+  1: { ring: "ring-[#F0B429]", glow: "shadow-[0_0_24px_-2px_rgba(240,180,41,0.55)]", text: "text-[#F0B429]", label: "1st" },
+  2: { ring: "ring-[#B8BCC8]", glow: "shadow-[0_0_18px_-4px_rgba(184,188,200,0.4)]", text: "text-[#B8BCC8]", label: "2nd" },
+  3: { ring: "ring-[#D97748]", glow: "shadow-[0_0_18px_-4px_rgba(217,119,72,0.45)]", text: "text-[#D97748]", label: "3rd" },
 };
 
 export default function LeaderboardPage() {
@@ -32,21 +33,29 @@ export default function LeaderboardPage() {
     })();
   }, []);
 
+  const podium = entries.slice(0, 3);
+  const rest = entries.slice(3);
+  const maxScore = useMemo(() => Math.max(1, ...entries.map((e) => e.top_score || 0)), [entries]);
+
+  // Podium visual order: 2nd - 1st - 3rd, with 1st sitting tallest in the middle.
+  const podiumOrder = [podium[1], podium[0], podium[2]].filter(Boolean) as LeaderboardEntry[];
+  const podiumHeight: Record<number, string> = { 1: "sm:h-40", 2: "sm:h-28", 3: "sm:h-20" };
+
   if (phase === "loading") {
     return (
-      <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-24">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+      <div className="flex min-h-[60vh] flex-col items-center justify-center bg-[#0B0C10] px-4 py-24">
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-[#7C5CFC] border-t-transparent" />
       </div>
     );
   }
 
   if (phase === "error") {
     return (
-      <div className="mx-auto max-w-md px-4 py-24 text-center">
-        <p className="text-sm font-medium text-red-600">{errorMsg}</p>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center bg-[#0B0C10] px-4 py-24 text-center">
+        <p className="text-sm font-medium text-[#E8697A]">{errorMsg}</p>
         <Link
           href="/"
-          className="mt-4 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          className="mt-4 inline-block rounded-lg bg-[#7C5CFC] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#6B4CE0]"
         >
           Back home
         </Link>
@@ -55,75 +64,146 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Leaderboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Top scores across all players</p>
-      </div>
+    <div className="min-h-screen bg-[#0B0C10]">
+      <style jsx global>{`
+        @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap");
+        .font-display {
+          font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+        }
+      `}</style>
 
-      {entries.length === 0 ? (
-        <p className="text-center text-sm text-gray-500">No scores yet — be the first to play!</p>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <ul className="divide-y divide-gray-100">
-            {entries.map((entry) => {
-              const isMe = user?.id === entry.id;
-              const avatarUrl = resolveAvatarUrl(entry.avatar);
+      <div className="mx-auto max-w-2xl px-4 py-12">
+        <div className="mb-10 text-center">
+          <p className="font-display text-xs font-medium uppercase tracking-[0.3em] text-[#7C5CFC]">
+            Season standings
+          </p>
+          <h1 className="font-display mt-2 text-3xl font-bold tracking-tight text-[#F4F4F6]">
+            Leaderboard
+          </h1>
+          <p className="mt-1 text-sm text-[#8B8D9A]">
+            {entries.length > 0 ? `${entries.length} players competing` : "Top scores across all players"}
+          </p>
+        </div>
 
-              return (
-                <li
-                  key={entry.id}
-                  className={`flex items-center gap-4 px-4 py-3.5 sm:px-6 ${
-                    isMe ? "bg-indigo-50/60" : ""
-                  }`}
-                >
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                      rankStyles[entry.rank] || "border-gray-200 text-gray-500"
+        {entries.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#2A2D38] bg-[#111319] px-6 py-16 text-center">
+            <p className="text-sm text-[#8B8D9A]">No scores yet. Be the first on the board.</p>
+          </div>
+        ) : (
+          <>
+            {/* Podium — top 3 */}
+            <div className="mb-8 flex items-end justify-center gap-3 sm:gap-4">
+              {podiumOrder.map((entry) => {
+                const isMe = user?.id === entry.id;
+                const avatarUrl = resolveAvatarUrl(entry.avatar);
+                const m = medal[entry.rank] ?? medal[3];
+                return (
+                  <div
+                    key={entry.id}
+                    className={`flex w-24 flex-col items-center rounded-2xl border border-[#22242E] bg-[#15171D] px-3 pb-4 pt-6 sm:w-32 ${podiumHeight[entry.rank] ?? ""} ${
+                      isMe ? "ring-1 ring-[#7C5CFC]" : ""
                     }`}
                   >
-                    {entry.rank}
-                  </span>
-
-                  <div className="relative shrink-0">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={entry.username}
-                        className="h-9 w-9 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-                        {entry.username?.[0]?.toUpperCase() || "?"}
-                      </span>
-                    )}
-                    {entry.is_online && (
-                      <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-gray-900">
-                      {entry.username}
-                      {isMe && <span className="ml-1.5 text-xs font-normal text-indigo-600">(you)</span>}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Level {entry.level} · {entry.xp} XP
-                      {entry.top_score_at && (
-                        <> · High score on {new Date(entry.top_score_at).toLocaleDateString()}</>
+                    <div className={`relative rounded-full ring-2 ${m.ring} ${m.glow}`}>
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={entry.username}
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1F2129] text-base font-semibold text-[#F4F4F6]">
+                          {entry.username?.[0]?.toUpperCase() || "?"}
+                        </span>
                       )}
+                      {entry.is_online && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#15171D] bg-[#34D399]" />
+                      )}
+                    </div>
+                    <span className={`font-display mt-2 text-xs font-bold ${m.text}`}>{m.label}</span>
+                    <p className="mt-1 w-full truncate text-center text-xs font-semibold text-[#F4F4F6]">
+                      {entry.username}
+                      {isMe && <span className="block text-[10px] font-normal text-[#7C5CFC]">You</span>}
                     </p>
+                    <p className="font-display mt-1 text-sm font-bold text-[#F4F4F6]">{entry.top_score}</p>
                   </div>
+                );
+              })}
+            </div>
 
-                  <span className="shrink-0 text-sm font-bold text-indigo-600">
-                    {entry.top_score}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+            {/* Ranked list — 4th onward */}
+            {rest.length > 0 && (
+              <div className="overflow-hidden rounded-2xl border border-[#22242E] bg-[#111319]">
+                <ul className="divide-y divide-[#1D1F28]">
+                  {rest.map((entry) => {
+                    const isMe = user?.id === entry.id;
+                    const avatarUrl = resolveAvatarUrl(entry.avatar);
+                    const barWidth = Math.max(4, Math.round(((entry.top_score || 0) / maxScore) * 100));
+
+                    return (
+                      <li key={entry.id} className="relative">
+                        {/* score bar — width encodes score relative to the top score */}
+                        <span
+                          className="pointer-events-none absolute inset-y-0 left-0 bg-[#7C5CFC]/[0.06]"
+                          style={{ width: `${barWidth}%` }}
+                          aria-hidden="true"
+                        />
+                        <div
+                          className={`relative flex items-center gap-4 px-4 py-3.5 transition-colors sm:px-6 ${
+                            isMe ? "bg-[#7C5CFC]/[0.08]" : "hover:bg-[#161822]"
+                          }`}
+                        >
+                          <span className="font-display w-6 shrink-0 text-center text-sm font-bold text-[#565A68]">
+                            {entry.rank}
+                          </span>
+
+                          <div className="relative shrink-0">
+                            {avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={entry.username}
+                                className="h-9 w-9 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1F2129] text-sm font-semibold text-[#F4F4F6]">
+                                {entry.username?.[0]?.toUpperCase() || "?"}
+                              </span>
+                            )}
+                            {entry.is_online && (
+                              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#111319] bg-[#34D399]" />
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-[#F4F4F6]">
+                              {entry.username}
+                              {isMe && (
+                                <span className="ml-1.5 rounded-full bg-[#7C5CFC]/20 px-1.5 py-0.5 text-[10px] font-medium text-[#A896FF]">
+                                  You
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-[#71758A]">
+                              Level {entry.level} · {entry.xp} XP
+                              {entry.top_score_at && (
+                                <> · High score {new Date(entry.top_score_at).toLocaleDateString()}</>
+                              )}
+                            </p>
+                          </div>
+
+                          <span className="font-display shrink-0 text-sm font-bold text-[#F4F4F6]">
+                            {entry.top_score}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
