@@ -10,6 +10,7 @@ const userrouter = require("./routes/users")
 const friendsrouter = require("./routes/friends");
 const dashboardrouter = require('./routes/dashboard')
 const configurationrouter = require('./routes/configuration')
+const duelrouter = require('./routes/duel')
 const gamerouter = require('./routes/game')
 const PORT = process.env.PORT || 8081;
 const app = express();
@@ -24,11 +25,13 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 app.use("/auth", authrouter);
+
 app.use("/users",userrouter)
 app.use("/dashboard",dashboardrouter)
 app.use("/configuration",configurationrouter)
 app.use("/game",gamerouter)
 app.use("/friends", friendsrouter);
+app.use("/duel",duelrouter)
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
