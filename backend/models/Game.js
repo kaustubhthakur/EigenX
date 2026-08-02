@@ -62,8 +62,6 @@ exports.getRandomArithmetic = async (level) => {
   return result.rows[0];
 };
 
-// Stores the question/answer currently being asked for this session,
-// so submitAnswer can later check the answer against it.
 exports.saveCurrentQuestion = async (sessionId, question, answer) => {
   const result = await pool.query(
     `
@@ -80,7 +78,7 @@ exports.saveCurrentQuestion = async (sessionId, question, answer) => {
   return result.rows[0];
 };
 
-// Reads back the question/answer stored by saveCurrentQuestion.
+
 exports.getCurrentQuestion = async (sessionId) => {
   const result = await pool.query(
     `
