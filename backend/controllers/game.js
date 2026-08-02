@@ -219,3 +219,4 @@ exports.submitAnswer = async (req, res) => {
 
   }
 };
+module.exports.generateQuestion = generateQuestion;
