@@ -143,19 +143,3 @@ exports.finishGame = async (sessionId) => {
 
   return result.rows[0];
 };
-
-exports.updateTopScore = async (userId, score) => {
-  const result = await pool.query(
-    `
-    UPDATE users
-    SET
-      top_score = GREATEST(top_score, $2),
-      xp = xp + $2
-    WHERE id = $1
-    RETURNING id, top_score, xp
-    `,
-    [userId, score]
-  );
-
-  return result.rows[0];
-};

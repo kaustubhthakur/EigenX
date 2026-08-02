@@ -7,11 +7,11 @@ import { useAuth } from "../../context/AuthContext";
 
 type Phase = "loading" | "loaded" | "error";
 
-// Rank 1/2/3 get a medal ring + glow. Everyone else gets a plain numbered slot.
-const medal: Record<number, { ring: string; glow: string; text: string; label: string }> = {
-  1: { ring: "ring-[#F0B429]", glow: "shadow-[0_0_24px_-2px_rgba(240,180,41,0.55)]", text: "text-[#F0B429]", label: "1st" },
-  2: { ring: "ring-[#B8BCC8]", glow: "shadow-[0_0_18px_-4px_rgba(184,188,200,0.4)]", text: "text-[#B8BCC8]", label: "2nd" },
-  3: { ring: "ring-[#D97748]", glow: "shadow-[0_0_18px_-4px_rgba(217,119,72,0.45)]", text: "text-[#D97748]", label: "3rd" },
+// Rank 1/2/3 get a restrained medal ring. Everyone else gets a plain numbered slot.
+const medal: Record<number, { ring: string; text: string; label: string }> = {
+  1: { ring: "ring-[#C9A227]", text: "text-[#C9A227]", label: "1st" },
+  2: { ring: "ring-[#9AA0AE]", text: "text-[#9AA0AE]", label: "2nd" },
+  3: { ring: "ring-[#B0805A]", text: "text-[#B0805A]", label: "3rd" },
 };
 
 export default function LeaderboardPage() {
@@ -44,7 +44,7 @@ export default function LeaderboardPage() {
   if (phase === "loading") {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center bg-[#0B0C10] px-4 py-24">
-        <span className="h-8 w-8 animate-spin rounded-full border-2 border-[#7C5CFC] border-t-transparent" />
+        <span className="h-8 w-8 animate-spin rounded-full border-2 border-[#5B5FEF] border-t-transparent" />
       </div>
     );
   }
@@ -55,7 +55,7 @@ export default function LeaderboardPage() {
         <p className="text-sm font-medium text-[#E8697A]">{errorMsg}</p>
         <Link
           href="/"
-          className="mt-4 inline-block rounded-lg bg-[#7C5CFC] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#6B4CE0]"
+          className="mt-4 inline-block rounded-lg bg-[#5B5FEF] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4B4FD9]"
         >
           Back home
         </Link>
@@ -74,10 +74,10 @@ export default function LeaderboardPage() {
 
       <div className="mx-auto max-w-2xl px-4 py-12">
         <div className="mb-10 text-center">
-          <p className="font-display text-xs font-medium uppercase tracking-[0.3em] text-[#7C5CFC]">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#7377A8]">
             Season standings
           </p>
-          <h1 className="font-display mt-2 text-3xl font-bold tracking-tight text-[#F4F4F6]">
+          <h1 className="font-display mt-2 text-2xl font-semibold tracking-tight text-[#F4F4F6]">
             Leaderboard
           </h1>
           <p className="mt-1 text-sm text-[#8B8D9A]">
@@ -86,7 +86,7 @@ export default function LeaderboardPage() {
         </div>
 
         {entries.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#2A2D38] bg-[#111319] px-6 py-16 text-center">
+          <div className="rounded-xl border border-dashed border-[#2A2D38] bg-[#111319] px-6 py-16 text-center">
             <p className="text-sm text-[#8B8D9A]">No scores yet. Be the first on the board.</p>
           </div>
         ) : (
@@ -100,11 +100,11 @@ export default function LeaderboardPage() {
                 return (
                   <div
                     key={entry.id}
-                    className={`flex w-24 flex-col items-center rounded-2xl border border-[#22242E] bg-[#15171D] px-3 pb-4 pt-6 sm:w-32 ${podiumHeight[entry.rank] ?? ""} ${
-                      isMe ? "ring-1 ring-[#7C5CFC]" : ""
+                    className={`flex w-24 flex-col items-center rounded-xl border bg-[#14151B] px-3 pb-4 pt-6 shadow-sm sm:w-32 ${podiumHeight[entry.rank] ?? ""} ${
+                      isMe ? "border-[#3E41A8]" : "border-[#22242E]"
                     }`}
                   >
-                    <div className={`relative rounded-full ring-2 ${m.ring} ${m.glow}`}>
+                    <div className={`relative rounded-full ring-2 ring-offset-2 ring-offset-[#14151B] ${m.ring}`}>
                       {avatarUrl ? (
                         <img
                           src={avatarUrl}
@@ -117,15 +117,15 @@ export default function LeaderboardPage() {
                         </span>
                       )}
                       {entry.is_online && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#15171D] bg-[#34D399]" />
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#14151B] bg-[#34D399]" />
                       )}
                     </div>
-                    <span className={`font-display mt-2 text-xs font-bold ${m.text}`}>{m.label}</span>
+                    <span className={`font-display mt-2 text-[11px] font-semibold tracking-wide ${m.text}`}>{m.label}</span>
                     <p className="mt-1 w-full truncate text-center text-xs font-semibold text-[#F4F4F6]">
                       {entry.username}
-                      {isMe && <span className="block text-[10px] font-normal text-[#7C5CFC]">You</span>}
+                      {isMe && <span className="block text-[10px] font-normal text-[#8A8EE0]">You</span>}
                     </p>
-                    <p className="font-display mt-1 text-sm font-bold text-[#F4F4F6]">{entry.top_score}</p>
+                    <p className="font-display mt-1 text-sm font-semibold text-[#F4F4F6]">{entry.top_score}</p>
                   </div>
                 );
               })}
@@ -133,7 +133,7 @@ export default function LeaderboardPage() {
 
             {/* Ranked list — 4th onward */}
             {rest.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border border-[#22242E] bg-[#111319]">
+              <div className="overflow-hidden rounded-xl border border-[#22242E] bg-[#111319]">
                 <ul className="divide-y divide-[#1D1F28]">
                   {rest.map((entry) => {
                     const isMe = user?.id === entry.id;
@@ -144,13 +144,13 @@ export default function LeaderboardPage() {
                       <li key={entry.id} className="relative">
                         {/* score bar — width encodes score relative to the top score */}
                         <span
-                          className="pointer-events-none absolute inset-y-0 left-0 bg-[#7C5CFC]/[0.06]"
+                          className="pointer-events-none absolute inset-y-0 left-0 bg-white/[0.03]"
                           style={{ width: `${barWidth}%` }}
                           aria-hidden="true"
                         />
                         <div
                           className={`relative flex items-center gap-4 px-4 py-3.5 transition-colors sm:px-6 ${
-                            isMe ? "bg-[#7C5CFC]/[0.08]" : "hover:bg-[#161822]"
+                            isMe ? "bg-[#3E41A8]/[0.10]" : "hover:bg-[#161822]"
                           }`}
                         >
                           <span className="font-display w-6 shrink-0 text-center text-sm font-bold text-[#565A68]">
@@ -178,7 +178,7 @@ export default function LeaderboardPage() {
                             <p className="truncate text-sm font-semibold text-[#F4F4F6]">
                               {entry.username}
                               {isMe && (
-                                <span className="ml-1.5 rounded-full bg-[#7C5CFC]/20 px-1.5 py-0.5 text-[10px] font-medium text-[#A896FF]">
+                                <span className="ml-1.5 rounded-full bg-[#3E41A8]/25 px-1.5 py-0.5 text-[10px] font-medium text-[#9EA1E8]">
                                   You
                                 </span>
                               )}
