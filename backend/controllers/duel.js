@@ -110,8 +110,7 @@ exports.getQuestion = async (req, res) => {
 
     let currentQuestion = duel.current_question;
 
-    // Only mint a new question when there isn't one pending — both players
-    // answer the same question, so we never regenerate mid-round.
+ 
     if (!currentQuestion) {
       const rule = await Game.getRandomArithmetic(duel.level);
       const arithmetic = generateQuestion(rule);
@@ -192,8 +191,7 @@ exports.submitAnswer = async (req, res) => {
     const updated = await Duel.markAnswered(duel.id, req.user.id);
     const opponentAnswered = isPlayer1 ? updated.player2_answered : updated.player1_answered;
 
-    // Once both players have answered this round, clear the question so the
-    // next getQuestion call mints a fresh one for both of them.
+ 
     if (updated.player1_answered && updated.player2_answered) {
       await Duel.clearCurrentQuestion(duel.id);
     }
@@ -211,7 +209,7 @@ exports.submitAnswer = async (req, res) => {
   }
 };
 
-// --- Friend challenges (direct, no level restriction) ---
+
 
 exports.challengeFriend = async (req, res) => {
   try {
@@ -258,7 +256,7 @@ exports.challengeFriend = async (req, res) => {
   }
 };
 
-// Poll this to see who's challenged you.
+
 exports.getIncomingChallenges = async (req, res) => {
   try {
     const challenges = await Duel.getIncomingChallenges(req.user.id);

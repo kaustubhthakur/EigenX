@@ -52,7 +52,7 @@ export default function DuelRoomPage() {
     if (!authLoading && !user) router.push("/login");
   }, [authLoading, user, router]);
 
-  // Load duel metadata (player ids, level, timer) so we know which side is "me".
+
   useEffect(() => {
     if (!duelId) return;
     const stored = loadStoredDuel(duelId);
