@@ -32,6 +32,31 @@ function ProfileSkeleton() {
   );
 }
 
+function StatIcon({ type }: { type: "level" | "xp" | "score" }) {
+  const common = "h-4 w-4";
+  if (type === "level") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={common}>
+        <path d="M12 3 2 8l10 5 10-5-10-5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M2 13l10 5 10-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (type === "xp") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={common}>
+        <path d="M13 2 3 14h7l-1 8 11-14h-7l1-6Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={common}>
+      <circle cx="12" cy="8" r="5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M7 13.5 5 22l7-3 7 3-2-8.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { setUser: setAuthUser } = useAuth() as {
@@ -119,110 +144,151 @@ export default function DashboardPage() {
   const xpProgressPct = Math.min(100, Math.round((xpIntoLevel / XP_PER_LEVEL) * 100));
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <div className="mb-6 flex items-center justify-between">
-        {!editing && (
-          <button
-            onClick={() => setEditing(true)}
-            className="rounded-lg border border-gray-200 px-3.5 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
-            Edit profile
-          </button>
-        )}
-      </div>
-
-      {success && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-medium text-green-700">
-          {success}
-        </div>
-      )}
-      {formError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
-          {formError}
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="h-20 bg-gradient-to-br from-indigo-600 to-indigo-400" />
-
-        <div className="-mt-12 px-6 pb-6">
-          <AvatarUpload
-            currentAvatar={profile.avatar}
-            username={profile.username}
-            onUploaded={applyUserUpdate}
-          />
-
-          <div className="mt-4 text-center">
-            {editing ? (
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                placeholder="Username"
-              />
-            ) : (
-              <p className="text-lg font-semibold text-gray-900">{profile.username}</p>
-            )}
-            <p className="text-sm text-gray-500">{profile.email}</p>
-          </div>
-
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-gray-50 py-3 text-center">
-              <p className="text-lg font-bold text-indigo-600">{profile.level}</p>
-              <p className="text-xs text-gray-500">Level</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 py-3 text-center">
-              <p className="text-lg font-bold text-indigo-600">{profile.xp}</p>
-              <p className="text-xs text-gray-500">XP</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 py-3 text-center">
-              <p className="text-lg font-bold text-indigo-600">{profile.score ?? 0}</p>
-              <p className="text-xs text-gray-500">Score</p>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="mb-1 flex justify-between text-xs text-gray-500">
-              <span>Level {profile.level}</span>
-              <span>
-                {xpIntoLevel} / {XP_PER_LEVEL} XP
-              </span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-indigo-400 transition-all"
-                style={{ width: `${xpProgressPct}%` }}
-              />
-            </div>
-          </div>
-
-          {editing && (
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setUsername(profile.username);
-                  setFormError(null);
-                }}
-                disabled={saving}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          {!editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+                <path
+                  d="m16.5 3.5 4 4L9 19l-5 1 1-5L16.5 3.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Edit profile
+            </button>
           )}
         </div>
-      </div>
 
-      <div className="mt-6">
-        <FriendsPanel currentUserId={profile.id} />
+        {success && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-medium text-green-700">
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0">
+              <path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {success}
+          </div>
+        )}
+        {formError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700">
+            {formError}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06),0_8px_24px_-12px_rgba(79,70,229,0.15)]">
+          <div className="relative h-24 bg-gradient-to-br from-indigo-600 via-indigo-500 to-violet-500">
+            <div
+              className="absolute inset-0 opacity-[0.15]"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+                backgroundSize: "16px 16px",
+              }}
+              aria-hidden="true"
+            />
+          </div>
+
+          <div className="-mt-14 px-6 pb-6">
+            <div className="flex flex-col items-center">
+              <div className="rounded-full bg-white p-1 shadow-md">
+                <AvatarUpload
+                  currentAvatar={profile.avatar}
+                  username={profile.username}
+                  onUploaded={applyUserUpdate}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 text-center">
+              {editing ? (
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center text-base font-semibold text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Username"
+                />
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-lg font-bold text-gray-900">{profile.username}</p>
+                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-600">
+                    LVL {profile.level}
+                  </span>
+                </div>
+              )}
+              <p className="mt-0.5 text-sm text-gray-500">{profile.email}</p>
+            </div>
+
+            <div className="mt-6 grid grid-cols-3 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-gray-50 py-4 text-center transition hover:border-indigo-100 hover:bg-indigo-50/50">
+                <div className="mb-1 flex items-center justify-center text-indigo-500">
+                  <StatIcon type="level" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">{profile.level}</p>
+                <p className="text-xs text-gray-500">Level</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 py-4 text-center transition hover:border-indigo-100 hover:bg-indigo-50/50">
+                <div className="mb-1 flex items-center justify-center text-indigo-500">
+                  <StatIcon type="xp" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">{profile.xp}</p>
+                <p className="text-xs text-gray-500">XP</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-gray-50 py-4 text-center transition hover:border-indigo-100 hover:bg-indigo-50/50">
+                <div className="mb-1 flex items-center justify-center text-indigo-500">
+                  <StatIcon type="score" />
+                </div>
+                <p className="text-lg font-bold text-gray-900">{profile.score ?? 0}</p>
+                <p className="text-xs text-gray-500">Score</p>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+              <div className="mb-2 flex items-center justify-between text-xs">
+                <span className="font-semibold text-gray-700">Level {profile.level} progress</span>
+                <span className="font-medium text-gray-500">
+                  {xpIntoLevel} / {XP_PER_LEVEL} XP
+                </span>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-violet-500 shadow-[0_0_8px_rgba(79,70,229,0.5)] transition-all duration-500"
+                  style={{ width: `${xpProgressPct}%` }}
+                />
+              </div>
+            </div>
+
+            {editing && (
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    setUsername(profile.username);
+                    setFormError(null);
+                  }}
+                  disabled={saving}
+                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <FriendsPanel currentUserId={profile.id} />
+        </div>
       </div>
     </div>
   );
