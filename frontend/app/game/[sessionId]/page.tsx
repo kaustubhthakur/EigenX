@@ -50,20 +50,19 @@ export default function GameSessionPage({
 
   useEffect(() => {
     loadNextQuestion();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [sessionId]);
 
-  // local countdown so the timer doesn't stall between requests;
-  // the backend remains the source of truth for actual game-over
+ 
   useEffect(() => {
     if (phase !== "playing" || remainingTime == null) return;
     if (remainingTime <= 0) {
-      loadNextQuestion(); // let the backend confirm game over
+      loadNextQuestion(); 
       return;
     }
     const t = setTimeout(() => setRemainingTime((r) => (r != null ? r - 1 : r)), 1000);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [phase, remainingTime]);
 
   useEffect(() => {
