@@ -37,7 +37,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-10 border-b border-gray-200/80 bg-white/90 backdrop-blur-xl shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <nav className="relative mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
-        {/* Logo + wordmark */}
+  
         <Link href="/" className="group flex items-center gap-2.5">
            <img
   src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQlh7i8SenqRDQg0JUIWBqeLTMJyn5EXZChG3wv8nqHbg&s=10"

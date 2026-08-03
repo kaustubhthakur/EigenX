@@ -18,13 +18,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  // userId returned by /login, needed by the verify-otp step
+
   const [pendingUserId, setPendingUserId] = useState<string | number | null>(null);
 
   useEffect(() => {
-    // The access token is an httpOnly cookie — JS can't read it directly,
-    // so on every fresh load we ask the backend "is this cookie still valid?"
-    // This runs once, on mount, before Navbar (or anything else) trusts `user`.
+  
     let cancelled = false;
 
     const hydrate = async () => {

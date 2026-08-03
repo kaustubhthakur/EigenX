@@ -123,7 +123,7 @@ export function uploadAvatar(file: File): Promise<ProfileResponse> {
     try {
       data = await res.json();
     } catch {
-      // no JSON body
+  
     }
     if (!res.ok) {
       const body = data as (ApiErrorBody & { message?: string }) | null;
@@ -242,7 +242,7 @@ export function getLeaderboard(): Promise<LeaderboardResponse> {
   return request<LeaderboardResponse>(DASHBOARD_API_URL, "/leaderboard");
 }
 
-// --- Duels: quick-match queue ---
+
 
 export function joinDuel(configurationId: string): Promise<JoinDuelResponse> {
   return request<JoinDuelResponse>(DUEL_API_URL, "/join", {
@@ -259,7 +259,6 @@ export function leaveDuelQueue(): Promise<{ success: boolean; message: string }>
   return request(DUEL_API_URL, "/queue", { method: "DELETE" });
 }
 
-// --- Duels: friend challenges ---
 
 export function challengeFriend(
   friendId: string,
@@ -291,7 +290,7 @@ export function cancelChallenge(challengeId: string): Promise<ChallengeResponse>
   });
 }
 
-// --- Duels: gameplay ---
+
 
 export function getDuelQuestion(duelId: string): Promise<DuelQuestionResponse> {
   return request<DuelQuestionResponse>(DUEL_API_URL, `/question/${duelId}`);

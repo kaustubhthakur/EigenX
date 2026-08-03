@@ -146,7 +146,7 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                     <div className="relative">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                         {f.avatar ? (
-                          // eslint-disable-next-line @next/next/no-img-element
+                     
                           <img src={resolveAvatarUrl(f.avatar)} alt={f.username} className="h-full w-full object-cover" />
                         ) : (
                           f.username[0]?.toUpperCase()
@@ -189,7 +189,7 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                       {r.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+                 
                         <img src={resolveAvatarUrl(r.avatar)} alt={r.username} className="h-full w-full object-cover" />
                       ) : (
                         r.username[0]?.toUpperCase()

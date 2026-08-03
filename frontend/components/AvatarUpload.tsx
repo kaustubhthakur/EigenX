@@ -61,8 +61,7 @@ export default function AvatarUpload({ currentAvatar, username, onUploaded }: Av
     if (file) handleFile(file);
   };
 
-  // preview = local blob URL right after picking a file (instant feedback)
-  // resolveAvatarUrl(currentAvatar) = the saved avatar, resolved to the backend's full URL
+
   const displaySrc = preview || resolveAvatarUrl(currentAvatar);
 
   return (
@@ -83,7 +82,7 @@ export default function AvatarUpload({ currentAvatar, username, onUploaded }: Av
         }`}
       >
         {displaySrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
+     
           <img src={displaySrc} alt={username} className="h-full w-full object-cover" />
         ) : (
           <span className="text-2xl font-semibold text-indigo-600">
