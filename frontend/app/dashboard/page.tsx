@@ -147,6 +147,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
         <div className="mb-6 flex items-center justify-between">
+          <div>
+         
+          </div>
           {!editing && (
             <button
               onClick={() => setEditing(true)}
@@ -241,8 +244,8 @@ export default function DashboardPage() {
                 <div className="mb-1 flex items-center justify-center text-indigo-500">
                   <StatIcon type="score" />
                 </div>
-                <p className="text-lg font-bold text-gray-900">{profile.score ?? 0}</p>
-                <p className="text-xs text-gray-500">Score</p>
+                <p className="text-lg font-bold text-gray-900">{profile.top_score ?? 0}</p>
+                <p className="text-xs text-gray-500">Highest Score</p>
               </div>
             </div>
 
