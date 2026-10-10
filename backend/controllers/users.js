@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const cloudinary = require("../config/cloudinary");
 
 const calculateLevel = (xp) => {
   return Math.floor(xp / 500) + 1;
@@ -108,38 +109,53 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-exports.updateProfile = async (req, res) => {
-  try {
-    const { username, avatar } = req.body;
 
-    const updatedUser = await User.updateUser(
-      req.user.id,
-      {
-        username,
-        avatar
-      }
-    );
+exports.uploadAvatar = async (req, res) => {
+  try {
+    const { image } = req.body;
+
+    if (!image || typeof image !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide an image",
+      });
+    }
+
+    // Upload directly to Cloudinary
+    const result = await cloudinary.uploader.upload(image, {
+      folder: "avatars",
+      public_id: `avatar-${req.user.id}`,
+      overwrite: true,
+      resource_type: "image",
+    });
+
+    // Save Cloudinary URL to the database
+    const updatedUser = await User.updateUser(req.user.id, {
+      avatar: result.secure_url,
+    });
+
     if (!updatedUser) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Profile updated successfully",
+      message: "Avatar uploaded successfully",
+      avatar: result.secure_url,
       user: {
         ...updatedUser,
-        level: calculateLevel(updatedUser.xp)
-      }
+        level: calculateLevel(updatedUser.xp),
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Cloudinary avatar upload error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update profile"
+      message: "Failed to upload avatar",
     });
   }
 };
