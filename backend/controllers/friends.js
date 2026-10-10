@@ -4,6 +4,7 @@ const Friend = require("../models/Friend");
 exports.sendFriendRequest = async (req, res) => {
   try {
     const { receiverId } = req.body;
+    const senderId = req.user.id;
 
     if (!receiverId) {
       return res.status(400).json({
@@ -12,7 +13,7 @@ exports.sendFriendRequest = async (req, res) => {
       });
     }
 
-    if (String(req.user.id) === String(receiverId)) {
+    if (String(senderId) === String(receiverId)) {
       return res.status(400).json({
         success: false,
         message: "You cannot send a friend request to yourself",
@@ -20,11 +21,11 @@ exports.sendFriendRequest = async (req, res) => {
     }
 
     const request = await Friend.sendFriendRequest(
-      req.user.id,
+      senderId,
       receiverId
     );
 
-    if (request?.alreadyExists) {
+    if (request.alreadyExists) {
       return res.status(200).json({
         success: true,
         alreadyRequested: true,
@@ -42,21 +43,12 @@ exports.sendFriendRequest = async (req, res) => {
   } catch (error) {
     console.error("Send friend request error:", error);
 
-    if (error.code === "23505") {
-      return res.status(200).json({
-        success: true,
-        alreadyRequested: true,
-        message: "Friend request already exists",
-      });
-    }
-
     return res.status(500).json({
       success: false,
       message: "Failed to send friend request",
     });
   }
 };
-
 exports.acceptFriendRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
@@ -115,10 +107,13 @@ exports.getPendingRequests = async (req, res) => {
   }
 };
 
-// Outgoing pending requests: used to keep the button as "Requested" after refresh.
 exports.getSentRequests = async (req, res) => {
   try {
+    console.log("Authenticated user:", req.user);
+
     const requests = await Friend.getSentRequests(req.user.id);
+
+    console.log("Outgoing requests:", requests);
 
     return res.status(200).json({
       success: true,
