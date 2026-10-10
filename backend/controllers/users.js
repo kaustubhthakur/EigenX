@@ -23,8 +23,12 @@ exports.uploadAvatar = async (req, res) => {
       user: { ...updatedUser, level: calculateLevel(updatedUser.xp) },
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Failed to upload avatar" });
+    console.error("Cloudinary avatar upload error:", error);
+
+  return res.status(500).json({
+    success: false,
+    message: error.message || "Failed to upload avatar",
+  });
   }
 };
 exports.getProfile = async (req, res) => {

@@ -110,26 +110,26 @@ export function updateScore(payload: UpdateScorePayload): Promise<ProfileRespons
 }
 
 
-export function uploadAvatar(file: File): Promise<ProfileResponse> {
-  const formData = new FormData();
-  formData.append("avatar", file);
 
-  return fetch(`${USERS_API_URL}/avatar`, {
+export async function uploadAvatar(file: File): Promise<ProfileResponse> {
+  const base64Image: string = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to convert image"));
+      }
+    };
+
+    reader.onerror = () => reject(new Error("Failed to read image"));
+    reader.readAsDataURL(file);
+  });
+
+  return request<ProfileResponse>(USERS_API_URL, "/avatar", {
     method: "POST",
-    credentials: "include",
-    body: formData,
-  }).then(async (res) => {
-    let data: unknown = null;
-    try {
-      data = await res.json();
-    } catch {
-  
-    }
-    if (!res.ok) {
-      const body = data as (ApiErrorBody & { message?: string }) | null;
-      throw new Error(body?.error || body?.message || "Failed to upload avatar");
-    }
-    return data as ProfileResponse;
+    body: { image: base64Image },
   });
 }
 
