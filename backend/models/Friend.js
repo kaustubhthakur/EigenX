@@ -18,6 +18,22 @@ exports.sendFriendRequest = async (
 
   return result.rows[0];
 };
+
+
+exports.getSentRequests = async (userId) => {
+  const result = await pool.query(
+    `
+    SELECT receiver_id
+    FROM friend_requests
+    WHERE sender_id = $1
+      AND status = 'pending'
+    `,
+    [userId]
+  );
+
+  return result.rows;
+};
+
 exports.acceptFriendRequest = async (
   requestId
 ) => {

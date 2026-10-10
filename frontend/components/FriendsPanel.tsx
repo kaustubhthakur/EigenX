@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   getFriends,
   getPendingRequests,
+  getSentRequests,
   sendFriendRequest,
   acceptFriendRequest,
   removeFriend,
@@ -38,13 +39,23 @@ export default function FriendsPanel({
     setError(null);
 
     try {
-      const [friendsRes, requestsRes] = await Promise.all([
+      const [friendsRes, requestsRes, sentRes] = await Promise.all([
         getFriends(),
         getPendingRequests(),
+        getSentRequests(),
       ]);
 
       setFriends(friendsRes.friends);
       setRequests(requestsRes.requests);
+
+      // Restore outgoing pending requests after refresh.
+      setRequestedTo(
+        new Set(
+          sentRes.requests.map((request) =>
+            String(request.receiver_id)
+          )
+        )
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load friends"
@@ -88,7 +99,9 @@ export default function FriendsPanel({
 
     try {
       await removeFriend(friendId);
-      setFriends((prev) => prev.filter((f) => f.id !== friendId));
+      setFriends((prev) =>
+        prev.filter((friend) => String(friend.id) !== String(friendId))
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to remove friend"
@@ -98,36 +111,44 @@ export default function FriendsPanel({
     }
   };
 
+  const handleSend = async (receiverId: string) => {
+    const normalizedId = String(receiverId);
 
-const handleSend = async (receiverId: string) => {
-  if (requestedTo.has(receiverId) || actioningId !== null) return;
+    if (requestedTo.has(normalizedId) || actioningId !== null) return;
 
-  setActioningId(receiverId);
-  setError(null);
+    setActioningId(normalizedId);
+    setError(null);
 
-  try {
-    await sendFriendRequest(receiverId);
+    try {
+      const response = await sendFriendRequest(normalizedId);
 
-    setRequestedTo((prev) => new Set(prev).add(receiverId));
-  } catch (err) {
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Failed to send friend request"
-    );
-  } finally {
-    setActioningId(null);
-  }
-};
+      if (response.success) {
+        setRequestedTo((prev) => {
+          const next = new Set(prev);
+          next.add(normalizedId);
+          return next;
+        });
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to send friend request"
+      );
+    } finally {
+      setActioningId(null);
+    }
+  };
 
-
-  const existingFriendIds = new Set(friends.map((f) => f.id));
+  const existingFriendIds = new Set(
+    friends.map((friend) => String(friend.id))
+  );
 
   const filteredUsers = allUsers.filter(
-    (u) =>
-      u.id !== currentUserId &&
-      !existingFriendIds.has(u.id) &&
-      u.username.toLowerCase().includes(query.toLowerCase())
+    (user) =>
+      String(user.id) !== String(currentUserId) &&
+      !existingFriendIds.has(String(user.id)) &&
+      user.username.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -143,17 +164,17 @@ const handleSend = async (receiverId: string) => {
             label: `Requests${requests.length ? ` (${requests.length})` : ""}`,
           },
           { key: "add" as Tab, label: "Add friend" },
-        ].map((t) => (
+        ].map((item) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={item.key}
+            onClick={() => setTab(item.key)}
             className={`flex-1 px-4 py-3 text-sm font-medium transition ${
-              tab === t.key
+              tab === item.key
                 ? "border-b-2 border-indigo-600 text-indigo-600"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
@@ -179,47 +200,49 @@ const handleSend = async (receiverId: string) => {
             <EmptyState text="No friends yet — add someone to get started." />
           ) : (
             <ul className="space-y-2">
-              {friends.map((f) => (
+              {friends.map((friend) => (
                 <li
-                  key={f.id}
+                  key={friend.id}
                   className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5"
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-                        {f.avatar ? (
+                        {friend.avatar ? (
                           <img
-                            src={resolveAvatarUrl(f.avatar)}
-                            alt={f.username}
+                            src={resolveAvatarUrl(friend.avatar)}
+                            alt={friend.username}
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          f.username[0]?.toUpperCase()
+                          friend.username[0]?.toUpperCase()
                         )}
                       </div>
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
-                          f.is_online ? "bg-green-500" : "bg-gray-300"
+                          friend.is_online ? "bg-green-500" : "bg-gray-300"
                         }`}
                       />
                     </div>
 
                     <div>
                       <p className="text-sm font-medium text-gray-900">
-                        {f.username}
+                        {friend.username}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Level {f.level} · {f.top_score} pts
+                        Level {friend.level} · {friend.top_score} pts
                       </p>
                     </div>
                   </div>
 
                   <button
-                    onClick={() => handleRemove(f.id)}
+                    onClick={() => handleRemove(String(friend.id))}
                     disabled={actioningId !== null}
                     className="rounded-lg px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
-                    {actioningId === f.id ? "Removing..." : "Remove"}
+                    {actioningId === String(friend.id)
+                      ? "Removing..."
+                      : "Remove"}
                   </button>
                 </li>
               ))}
@@ -230,34 +253,37 @@ const handleSend = async (receiverId: string) => {
             <EmptyState text="No pending friend requests." />
           ) : (
             <ul className="space-y-2">
-              {requests.map((r) => (
+              {requests.map((request) => (
                 <li
-                  key={r.id}
+                  key={request.id}
                   className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-                      {r.avatar ? (
+                      {request.avatar ? (
                         <img
-                          src={resolveAvatarUrl(r.avatar)}
-                          alt={r.username}
+                          src={resolveAvatarUrl(request.avatar)}
+                          alt={request.username}
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        r.username[0]?.toUpperCase()
+                        request.username[0]?.toUpperCase()
                       )}
                     </div>
+
                     <p className="text-sm font-medium text-gray-900">
-                      {r.username}
+                      {request.username}
                     </p>
                   </div>
 
                   <button
-                    onClick={() => handleAccept(r.id)}
+                    onClick={() => handleAccept(String(request.id))}
                     disabled={actioningId !== null}
                     className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
                   >
-                    {actioningId === r.id ? "Accepting..." : "Accept"}
+                    {actioningId === String(request.id)
+                      ? "Accepting..."
+                      : "Accept"}
                   </button>
                 </li>
               ))}
@@ -276,43 +302,47 @@ const handleSend = async (receiverId: string) => {
               <EmptyState text="No matching users found." />
             ) : (
               <ul className="max-h-72 space-y-2 overflow-y-auto">
-                {filteredUsers.slice(0, 20).map((u) => (
-                  <li
-                    key={u.id}
-                    className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
-                        {u.avatar ? (
-                          <img
-                            src={resolveAvatarUrl(u.avatar)}
-                            alt={u.username}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          u.username[0]?.toUpperCase()
-                        )}
-                      </div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {u.username}
-                      </p>
-                    </div>
+                {filteredUsers.slice(0, 20).map((user) => {
+                  const userId = String(user.id);
+                  const isRequested = requestedTo.has(userId);
 
-                    <button
-                      onClick={() => handleSend(u.id)}
-                      disabled={
-                        actioningId !== null || requestedTo.has(u.id)
-                      }
-                      className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
+                  return (
+                    <li
+                      key={userId}
+                      className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5"
                     >
-                      {requestedTo.has(u.id)
-                        ? "Requested"
-                        : actioningId === u.id
-                          ? "Sending..."
-                          : "Add"}
-                    </button>
-                  </li>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+                          {user.avatar ? (
+                            <img
+                              src={resolveAvatarUrl(user.avatar)}
+                              alt={user.username}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            user.username[0]?.toUpperCase()
+                          )}
+                        </div>
+
+                        <p className="text-sm font-medium text-gray-900">
+                          {user.username}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleSend(userId)}
+                        disabled={actioningId !== null || isRequested}
+                        className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        {isRequested
+                          ? "Requested"
+                          : actioningId === userId
+                            ? "Sending..."
+                            : "Add"}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

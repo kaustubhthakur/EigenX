@@ -199,6 +199,16 @@ export interface QuestionResponse {
   question?: string;
 }
 
+export interface SentRequestsResponse {
+  success: boolean;
+  count: number;
+  requests: { receiver_id: string | number }[];
+}
+
+export function getSentRequests(): Promise<SentRequestsResponse> {
+  return request<SentRequestsResponse>(FRIENDS_API_URL, "/sent");
+}
+
 export interface AnswerResponse {
   success: boolean;
   gameOver?: boolean;

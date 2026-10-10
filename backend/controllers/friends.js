@@ -1,5 +1,5 @@
-const Friend = require("../models/Friend");
 
+const Friend = require("../models/Friend");
 
 exports.sendFriendRequest = async (req, res) => {
   try {
@@ -57,104 +57,100 @@ exports.sendFriendRequest = async (req, res) => {
   }
 };
 
-exports.acceptFriendRequest = async (
-  req,
-  res
-) => {
+exports.acceptFriendRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
 
-    await Friend.acceptFriendRequest(
-      requestId
-    );
+    await Friend.acceptFriendRequest(requestId);
 
     return res.status(200).json({
       success: true,
-      message: "Friend request accepted"
+      message: "Friend request accepted",
     });
   } catch (error) {
-    console.error(error);
+    console.error("Accept friend request error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to accept friend request"
+      message: "Failed to accept friend request",
     });
   }
 };
 
 exports.getFriends = async (req, res) => {
   try {
-    const friends =
-      await Friend.getFriends(
-        req.user.id
-      );
+    const friends = await Friend.getFriends(req.user.id);
 
     return res.status(200).json({
       success: true,
       count: friends.length,
-      friends
+      friends,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get friends error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch friends"
+      message: "Failed to fetch friends",
     });
   }
 };
 
-exports.getPendingRequests = async (
-  req,
-  res
-) => {
+exports.getPendingRequests = async (req, res) => {
   try {
-    const requests =
-      await Friend.getPendingRequests(
-        req.user.id
-      );
+    const requests = await Friend.getPendingRequests(req.user.id);
 
     return res.status(200).json({
       success: true,
       count: requests.length,
-      requests
+      requests,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get pending requests error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to fetch requests"
+      message: "Failed to fetch requests",
     });
   }
 };
 
-exports.removeFriend = async (
-  req,
-  res
-) => {
+// Outgoing pending requests: used to keep the button as "Requested" after refresh.
+exports.getSentRequests = async (req, res) => {
   try {
-    const { friendId } = req.params;
-
-    await Friend.removeFriend(
-      req.user.id,
-      friendId
-    );
+    const requests = await Friend.getSentRequests(req.user.id);
 
     return res.status(200).json({
       success: true,
-      message: "Friend removed"
+      count: requests.length,
+      requests,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get sent requests error:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        "Failed to remove friend"
+      message: "Failed to fetch sent requests",
+    });
+  }
+};
+
+exports.removeFriend = async (req, res) => {
+  try {
+    const { friendId } = req.params;
+
+    await Friend.removeFriend(req.user.id, friendId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Friend removed",
+    });
+  } catch (error) {
+    console.error("Remove friend error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove friend",
     });
   }
 };
