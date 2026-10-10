@@ -3,3 +3,34 @@ EigenX
 - dashboard(ranking based on time constraint,level)
 - mental math(3 level)
 - profile with online/offline feature 
+
+
+START
+                |
+              Login
+                |
+           Main Dashboard
+                |
+    +-----------+-----------+
+    |           |           |
+    |           |           |
+ Dual Feature  Mental Math  Profile
+    |           |           |
+    |           |           +-- Online / Offline
+    |           |
+    |           +-- Level 1
+    |           +-- Level 2
+    |           +-- Level 3
+    |
+    +-- Invite a Friend
+    |
+    +-- Random Search
+           |
+      Match by Skills
+
+
+Dashboard
+    |
+    +-- Ranking by Time Constraint
+    |
+    +-- Ranking by Level
