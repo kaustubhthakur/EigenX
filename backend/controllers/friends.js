@@ -1,5 +1,6 @@
 const Friend = require("../models/Friend");
 
+
 exports.sendFriendRequest = async (req, res) => {
   try {
     const { receiverId } = req.body;
@@ -7,27 +8,51 @@ exports.sendFriendRequest = async (req, res) => {
     if (!receiverId) {
       return res.status(400).json({
         success: false,
-        message: "Receiver ID is required"
+        message: "Receiver ID is required",
       });
     }
 
-    const request =
-      await Friend.sendFriendRequest(
-        req.user.id,
-        receiverId
-      );
+    if (String(req.user.id) === String(receiverId)) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot send a friend request to yourself",
+      });
+    }
+
+    const request = await Friend.sendFriendRequest(
+      req.user.id,
+      receiverId
+    );
+
+    if (request?.alreadyExists) {
+      return res.status(200).json({
+        success: true,
+        alreadyRequested: true,
+        message: "Friend request already exists",
+        request: request.request,
+      });
+    }
 
     return res.status(201).json({
       success: true,
+      alreadyRequested: false,
       message: "Friend request sent",
-      request
+      request,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Send friend request error:", error);
+
+    if (error.code === "23505") {
+      return res.status(200).json({
+        success: true,
+        alreadyRequested: true,
+        message: "Friend request already exists",
+      });
+    }
 
     return res.status(500).json({
       success: false,
-      message: "Failed to send friend request"
+      message: "Failed to send friend request",
     });
   }
 };

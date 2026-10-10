@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -15,7 +16,11 @@ import type { UserProfile } from "../types/user";
 
 type Tab = "friends" | "requests" | "add";
 
-export default function FriendsPanel({ currentUserId }: { currentUserId: string }) {
+export default function FriendsPanel({
+  currentUserId,
+}: {
+  currentUserId: string;
+}) {
   const [tab, setTab] = useState<Tab>("friends");
 
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -26,28 +31,36 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
 
   const [query, setQuery] = useState("");
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [sentTo, setSentTo] = useState<Set<string>>(new Set());
+  const [requestedTo, setRequestedTo] = useState<Set<string>>(new Set());
 
   const loadAll = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const [friendsRes, requestsRes] = await Promise.all([getFriends(), getPendingRequests()]);
+      const [friendsRes, requestsRes] = await Promise.all([
+        getFriends(),
+        getPendingRequests(),
+      ]);
+
       setFriends(friendsRes.friends);
       setRequests(requestsRes.requests);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load friends");
+      setError(
+        err instanceof Error ? err.message : "Failed to load friends"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAll();
+    void loadAll();
   }, []);
 
   useEffect(() => {
-    if (tab !== "add" || allUsers.length) return;
+    if (tab !== "add" || allUsers.length > 0) return;
+
     getAllUsers()
       .then((res) => setAllUsers(res.users))
       .catch(() => setAllUsers([]));
@@ -55,11 +68,15 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
 
   const handleAccept = async (requestId: string) => {
     setActioningId(requestId);
+    setError(null);
+
     try {
       await acceptFriendRequest(requestId);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept request");
+      setError(
+        err instanceof Error ? err.message : "Failed to accept request"
+      );
     } finally {
       setActioningId(null);
     }
@@ -67,29 +84,45 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
 
   const handleRemove = async (friendId: string) => {
     setActioningId(friendId);
+    setError(null);
+
     try {
       await removeFriend(friendId);
       setFriends((prev) => prev.filter((f) => f.id !== friendId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove friend");
+      setError(
+        err instanceof Error ? err.message : "Failed to remove friend"
+      );
     } finally {
       setActioningId(null);
     }
   };
 
-  const handleSend = async (receiverId: string) => {
-    setActioningId(receiverId);
-    try {
-      await sendFriendRequest(receiverId);
-      setSentTo((prev) => new Set(prev).add(receiverId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send request");
-    } finally {
-      setActioningId(null);
-    }
-  };
+
+const handleSend = async (receiverId: string) => {
+  if (requestedTo.has(receiverId) || actioningId !== null) return;
+
+  setActioningId(receiverId);
+  setError(null);
+
+  try {
+    await sendFriendRequest(receiverId);
+
+    setRequestedTo((prev) => new Set(prev).add(receiverId));
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Failed to send friend request"
+    );
+  } finally {
+    setActioningId(null);
+  }
+};
+
 
   const existingFriendIds = new Set(friends.map((f) => f.id));
+
   const filteredUsers = allUsers.filter(
     (u) =>
       u.id !== currentUserId &&
@@ -101,8 +134,14 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="flex border-b border-gray-100">
         {[
-          { key: "friends" as Tab, label: `Friends${friends.length ? ` (${friends.length})` : ""}` },
-          { key: "requests" as Tab, label: `Requests${requests.length ? ` (${requests.length})` : ""}` },
+          {
+            key: "friends" as Tab,
+            label: `Friends${friends.length ? ` (${friends.length})` : ""}`,
+          },
+          {
+            key: "requests" as Tab,
+            label: `Requests${requests.length ? ` (${requests.length})` : ""}`,
+          },
           { key: "add" as Tab, label: "Add friend" },
         ].map((t) => (
           <button
@@ -129,7 +168,10 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
         {loading ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />
+              <div
+                key={i}
+                className="h-14 animate-pulse rounded-xl bg-gray-100"
+              />
             ))}
           </div>
         ) : tab === "friends" ? (
@@ -146,8 +188,11 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                     <div className="relative">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                         {f.avatar ? (
-                     
-                          <img src={resolveAvatarUrl(f.avatar)} alt={f.username} className="h-full w-full object-cover" />
+                          <img
+                            src={resolveAvatarUrl(f.avatar)}
+                            alt={f.username}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           f.username[0]?.toUpperCase()
                         )}
@@ -158,16 +203,20 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                         }`}
                       />
                     </div>
+
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{f.username}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {f.username}
+                      </p>
                       <p className="text-xs text-gray-500">
                         Level {f.level} · {f.top_score} pts
                       </p>
                     </div>
                   </div>
+
                   <button
                     onClick={() => handleRemove(f.id)}
-                    disabled={actioningId === f.id}
+                    disabled={actioningId !== null}
                     className="rounded-lg px-2.5 py-1 text-xs font-medium text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
                     {actioningId === f.id ? "Removing..." : "Remove"}
@@ -189,17 +238,23 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                       {r.avatar ? (
-                 
-                        <img src={resolveAvatarUrl(r.avatar)} alt={r.username} className="h-full w-full object-cover" />
+                        <img
+                          src={resolveAvatarUrl(r.avatar)}
+                          alt={r.username}
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         r.username[0]?.toUpperCase()
                       )}
                     </div>
-                    <p className="text-sm font-medium text-gray-900">{r.username}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {r.username}
+                    </p>
                   </div>
+
                   <button
                     onClick={() => handleAccept(r.id)}
-                    disabled={actioningId === r.id}
+                    disabled={actioningId !== null}
                     className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
                   >
                     {actioningId === r.id ? "Accepting..." : "Accept"}
@@ -216,6 +271,7 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
               placeholder="Search by username..."
               className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
+
             {query && filteredUsers.length === 0 ? (
               <EmptyState text="No matching users found." />
             ) : (
@@ -228,20 +284,32 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
                         {u.avatar ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={resolveAvatarUrl(u.avatar)} alt={u.username} className="h-full w-full object-cover" />
+                          <img
+                            src={resolveAvatarUrl(u.avatar)}
+                            alt={u.username}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           u.username[0]?.toUpperCase()
                         )}
                       </div>
-                      <p className="text-sm font-medium text-gray-900">{u.username}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {u.username}
+                      </p>
                     </div>
+
                     <button
                       onClick={() => handleSend(u.id)}
-                      disabled={actioningId === u.id || sentTo.has(u.id)}
+                      disabled={
+                        actioningId !== null || requestedTo.has(u.id)
+                      }
                       className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50"
                     >
-                      {sentTo.has(u.id) ? "Sent" : actioningId === u.id ? "Sending..." : "Add"}
+                      {requestedTo.has(u.id)
+                        ? "Requested"
+                        : actioningId === u.id
+                          ? "Sending..."
+                          : "Add"}
                     </button>
                   </li>
                 ))}
@@ -255,5 +323,7 @@ export default function FriendsPanel({ currentUserId }: { currentUserId: string 
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <p className="py-8 text-center text-sm text-gray-400">{text}</p>;
+  return (
+    <p className="py-8 text-center text-sm text-gray-400">{text}</p>
+  );
 }
