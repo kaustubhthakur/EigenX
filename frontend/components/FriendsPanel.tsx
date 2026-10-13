@@ -61,7 +61,7 @@ export default function FriendsPanel() {
           getAllUsers(),
         ]);
 
-      // Adjust this line if your profile API returns a different shape.
+
       const profile = (
         profileRes as {
           user?: { id?: string | number };
@@ -81,14 +81,14 @@ export default function FriendsPanel() {
       setFriends(friendsRes.friends ?? []);
       setRequests(requestsRes.requests ?? []);
 
-      // Never show the logged-in user in Add friend.
+ 
       setUsers(
         (usersRes.users ?? []).filter(
           (user) => String(user.id) !== myId
         )
       );
 
-      // Restore outgoing pending requests after refresh.
+  
       setRequestedTo(
         new Set(
           (sentRes.requests ?? []).map((request) =>
@@ -123,7 +123,7 @@ export default function FriendsPanel() {
     try {
       await sendFriendRequest(id);
 
-      // Update immediately; loadAll also restores it after refresh.
+   
       setRequestedTo((previous) => {
         const next = new Set(previous);
         next.add(id);
