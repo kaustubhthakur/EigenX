@@ -8,7 +8,7 @@ import { getQuestion, submitAnswer } from "../../../lib/api";
 
 const CountdownOrb = dynamic(() => import("../../../components/CountdownOrb"), {
   ssr: false,
-  loading: () => <div className="mx-auto h-60 w-60" />,
+  loading: () => <div className="mx-auto h-48 w-48" />,
 });
 
 type Phase = "loading" | "playing" | "gameover" | "error";
@@ -45,8 +45,18 @@ export default function GameSessionPage({
       }
 
       setQuestion(res.question ?? null);
-      setRemainingTime(res.remainingTime ?? null);
-      setTotalTime(res.remainingTime ?? null);
+      // One continuous timer for the whole session: never reset it per question.
+      const serverTime = res.remainingTime ?? null;
+      setRemainingTime((prev) =>
+        serverTime == null
+          ? prev
+          : prev == null || prev <= 0
+            ? serverTime
+            : Math.min(prev, serverTime)
+      );
+      setTotalTime((prev) =>
+        serverTime == null ? prev : prev == null ? serverTime : Math.max(prev, serverTime)
+      );
       setPhase("playing");
       setAnswer("");
       inputRef.current?.focus();
