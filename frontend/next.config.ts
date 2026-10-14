@@ -1,11 +1,12 @@
 import type { NextConfig } from "next";
-   import path from "path";
+import path from "path";
 
-   const nextConfig: NextConfig = {
-     reactStrictMode: true,
-     turbopack: {
-       root: path.join(__dirname),
-     },
-   };
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  devIndicators: false,
+  turbopack: {
+    root: path.join(__dirname),
+  },
+};
 
-   export default nextConfig;
+export default nextConfig;
