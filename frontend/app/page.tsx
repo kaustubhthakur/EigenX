@@ -180,7 +180,9 @@ export default function HomePage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Start a game</h2>
               <p className="text-xs text-gray-500">
-                {isCustomSelected ? "Build your own challenge" : "Choose a level and a timer to begin"}
+                {isCustomSelected
+                  ? "Set your own arithmetic and timer"
+                  : "Choose a level and a timer to begin"}
               </p>
             </div>
           </div>
@@ -201,11 +203,13 @@ export default function HomePage() {
                     setSelectedLevel(level);
                     setError(null);
                   }}
-                  className={`${chipClass(selectedLevel === level)} ${level === customLevel ? "flex items-center gap-1.5" : ""}`}
+                  className={`${chipClass(selectedLevel === level)} ${
+                    level === customLevel ? "flex items-center gap-1.5" : ""
+                  }`}
                 >
                   {level === customLevel ? (
                     <>
-                      <SlidersHorizontal className="h-3.5 w-3.5" /> Custom
+                      <SlidersHorizontal className="h-3.5 w-3.5" /> Unknown
                     </>
                   ) : (
                     `Level ${level}`
@@ -227,7 +231,9 @@ export default function HomePage() {
                   min={MIN_CUSTOM_TIMER}
                   max={MAX_CUSTOM_TIMER}
                   value={Number.isNaN(custom.timer) ? "" : custom.timer}
-                  onChange={(e) => updateCustom({ timer: e.target.value === "" ? NaN : Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateCustom({ timer: e.target.value === "" ? NaN : Number(e.target.value) })
+                  }
                   className={selectClass}
                 />
                 <p className="mt-1 text-xs text-gray-400">

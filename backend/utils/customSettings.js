@@ -3,8 +3,6 @@ const MAX_DIGITS = 8;
 const MAX_TIMER = 600;
 const MAX_DECIMALS = 4;
 
-exports.CUSTOM_LEVEL = 4;
-
 exports.validateCustomSettings = (input = {}) => {
   const {
     timer,

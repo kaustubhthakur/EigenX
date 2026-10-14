@@ -114,7 +114,18 @@ exports.getQuestion = async (req, res) => {
       });
     }
 
-    const rule = await Game.getRandomArithmetic(session.level);
+    // Custom sessions carry their own settings; normal ones pass null
+    const rule = await Game.getRandomArithmetic(
+      session.level,
+      session.custom_settings
+    );
+
+    if (!rule) {
+      return res.status(500).json({
+        success: false,
+        message: `No arithmetic rules configured for level ${session.level}`
+      });
+    }
 
     const arithmetic = generateQuestion(rule);
 
