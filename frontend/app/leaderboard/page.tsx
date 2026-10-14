@@ -152,10 +152,7 @@ const paintDot = (ctx: CanvasRenderingContext2D, s: number) => {
 const PED_R = 0.95;
 const MEDAL_R = 0.47;
 
-/**
- * Pedestal as one lathed profile: stepped plinth, straight body and a rounded top lip,
- * so every edge catches light the way a machined or cast part would.
- */
+
 function pedestalGeometry(h: number) {
   const R = PED_R;
   const lip = 0.12;
@@ -177,7 +174,6 @@ function pedestalGeometry(h: number) {
   return new THREE.LatheGeometry(pts, 128);
 }
 
-/** Coin with a raised, beveled rim, a recessed field and a milled (reeded) edge. */
 function coinGeometry() {
   const R = MEDAL_R;
   const t = 0.06; // rim half-thickness
@@ -233,12 +229,7 @@ function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
   );
 }
 
-/**
- * Three pedestals with a spinning, floating medal above each one. The scene renders on a
- * transparent canvas so it sits directly on the page, with no frame around it.
- * Names and scores are HTML labels pinned to the medals, so avatars load as normal
- * images (no CORS needed) and text stays crisp.
- */
+
 function PodiumScene({
   podium,
   meId,
@@ -272,7 +263,7 @@ function PodiumScene({
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    // Filmic tone mapping keeps highlights on the metal from clipping to flat white.
+
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
@@ -291,12 +282,12 @@ function PodiumScene({
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
 
-    // Studio reflections so the metal reads as real gold, silver and bronze.
+
     const pmrem = track(new THREE.PMREMGenerator(renderer));
     const envRT = track(pmrem.fromScene(new RoomEnvironment(), 0.04));
     scene.environment = envRT.texture;
 
-    // Warm key light with soft shadows, a cool rim light for edge highlights, gentle fill.
+
     scene.add(new THREE.HemisphereLight(0xffffff, 0xdfe3ee, 0.35));
     const key = new THREE.DirectionalLight(0xfff3e0, 2.1);
     key.position.set(4, 8, 6);
@@ -313,7 +304,7 @@ function PodiumScene({
     const stage = new THREE.Group();
     scene.add(stage);
 
-    // Ground that only receives shadows, so the podium sits on the page itself.
+  
     const ground = new THREE.Mesh(
       track(new THREE.PlaneGeometry(20, 20)),
       track(new THREE.ShadowMaterial({ opacity: 0.18 }))
@@ -379,7 +370,7 @@ function PodiumScene({
         })
       );
 
-      // Pedestal: lathed ceramic body, medal-colored band, and a thin metal inlay on top.
+
       const ped = new THREE.Group();
       ped.position.x = slot.x;
       const body = new THREE.Mesh(track(pedestalGeometry(h)), ceramic);
@@ -395,7 +386,6 @@ function PodiumScene({
       });
       ped.add(body, band, inlay);
 
-      // Place numeral as metallic lettering wrapped onto the front of the pedestal.
       const plateH = Math.min(0.85, h * 0.5);
       const plateLen = plateH / PED_R;
       const plate = new THREE.Mesh(
