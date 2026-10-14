@@ -1,4 +1,3 @@
-
 import type {
   ApiErrorBody,
   LoginPayload,
@@ -261,6 +260,17 @@ export interface GameConfiguration {
   id: string;
   level: number;
   timer: number;
+  is_custom?: boolean;
+}
+
+export interface CustomSettings {
+  timer: number;
+  operations: string[];
+  leftMinDigits: number;
+  leftMaxDigits: number;
+  rightMinDigits: number;
+  rightMaxDigits: number;
+  decimalPlaces: number;
 }
 
 export interface StartGameResponse {
@@ -295,6 +305,15 @@ export function startGame(payload: {
   return request<StartGameResponse>(CONFIG_API_URL, "/start", {
     method: "POST",
     body: payload,
+  });
+}
+
+export function startCustomGame(
+  settings: CustomSettings
+): Promise<StartGameResponse> {
+  return request<StartGameResponse>(CONFIG_API_URL, "/start-custom", {
+    method: "POST",
+    body: settings,
   });
 }
 
