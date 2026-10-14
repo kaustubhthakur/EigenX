@@ -26,31 +26,98 @@ const SLOTS = [
 const formatScore = (n: number | null | undefined) =>
   n && n > 0 ? n.toLocaleString("en-US") : "—";
 
-/** Numeral drawn on a canvas, used for coin faces and the podium fronts. */
-function numeralTexture(
-  text: string,
-  fontFamily: string,
-  opts: { background?: string; fill: string }
+const mix = (hex: string, to: number, amt: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (to - v) * amt));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+};
+
+const rgba = (hex: string, a: number) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
+
+/** Square canvas texture that can be repainted (used once the web font has loaded). */
+function canvasTexture(
+  size: number,
+  paint: (ctx: CanvasRenderingContext2D, s: number) => void,
+  anisotropy: number
 ) {
-  const size = 256;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  if (opts.background) {
-    ctx.fillStyle = opts.background;
-    ctx.fillRect(0, 0, size, size);
-  }
-  ctx.fillStyle = opts.fill;
-  ctx.font = `700 ${size * 0.62}px ${fontFamily}, system-ui, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, size / 2, size / 2 + size * 0.04);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  tex.anisotropy = anisotropy;
+  const repaint = () => {
+    ctx.clearRect(0, 0, size, size);
+    paint(ctx, size);
+    tex.needsUpdate = true;
+  };
+  repaint();
+  return { tex, repaint };
 }
+
+const paintMedalFace = (n: string, font: string) => (ctx: CanvasRenderingContext2D, s: number) => {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(1, "#d6d6d6");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  ctx.strokeStyle = "#b0b0b0";
+  ctx.lineWidth = s * 0.012;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = s * 0.006;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.405, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.font = `700 ${s * 0.54}px ${font}, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#8a8a8a";
+  ctx.fillText(n, s / 2, s / 2 + s * 0.03);
+};
+
+const paintPlate = (n: string, font: string, hex: string) => (ctx: CanvasRenderingContext2D, s: number) => {
+  ctx.font = `700 ${s * 0.8}px ${font}, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const g = ctx.createLinearGradient(0, s * 0.12, 0, s * 0.88);
+  g.addColorStop(0, mix(hex, 255, 0.4));
+  g.addColorStop(1, mix(hex, 0, 0.1));
+  ctx.fillStyle = g;
+  ctx.fillText(n, s / 2, s / 2 + s * 0.04);
+};
+
+const paintGlow = (hex: string) => (ctx: CanvasRenderingContext2D, s: number) => {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, rgba(hex, 0.5));
+  g.addColorStop(0.5, rgba(hex, 0.14));
+  g.addColorStop(1, rgba(hex, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+};
+
+const paintBlob = (ctx: CanvasRenderingContext2D, s: number) => {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(30,27,75,0.30)");
+  g.addColorStop(0.6, "rgba(30,27,75,0.08)");
+  g.addColorStop(1, "rgba(30,27,75,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+};
+
+const paintDot = (ctx: CanvasRenderingContext2D, s: number) => {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.4, "rgba(255,255,255,0.7)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+};
 
 function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
   const url = resolveAvatarUrl(entry.avatar);
@@ -90,6 +157,7 @@ function PodiumScene({
     const wrap = wrapRef.current;
     if (!wrap) return;
 
+    let cancelled = false;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const fontFamily = display.style.fontFamily;
     const disposables: { dispose: () => void }[] = [];
@@ -97,6 +165,7 @@ function PodiumScene({
       disposables.push(d);
       return d;
     };
+    const repaints: (() => void)[] = [];
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -111,129 +180,249 @@ function PodiumScene({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.display = "block";
     wrap.prepend(renderer.domElement);
+    const aniso = renderer.capabilities.getMaxAnisotropy();
+
+    const makeTex = (size: number, paint: (ctx: CanvasRenderingContext2D, s: number) => void) => {
+      const r = canvasTexture(size, paint, aniso);
+      track(r.tex);
+      repaints.push(r.repaint);
+      return r.tex;
+    };
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
+    const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
 
-    // Studio-style reflections so the metal coins read as gold, silver and bronze.
+    // Studio-style reflections so the metal reads as real gold, silver and bronze.
     const pmrem = track(new THREE.PMREMGenerator(renderer));
     const envRT = track(pmrem.fromScene(new RoomEnvironment(), 0.04));
     scene.environment = envRT.texture;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xe4e7f2, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xe4e7f2, 0.55));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(3, 7, 6);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.radius = 4;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 5;
+    sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 });
     scene.add(sun);
 
     const stage = new THREE.Group();
     scene.add(stage);
 
-    // Ground that only receives the shadows.
-    const groundMat = track(new THREE.ShadowMaterial({ opacity: 0.1 }));
-    const ground = new THREE.Mesh(track(new THREE.PlaneGeometry(20, 20)), groundMat);
+    // Ground that only receives the shadows, plus a soft contact shadow under each pedestal.
+    const ground = new THREE.Mesh(
+      track(new THREE.PlaneGeometry(20, 20)),
+      track(new THREE.ShadowMaterial({ opacity: 0.07 }))
+    );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     stage.add(ground);
 
-    const blockGeo = (h: number) => track(new RoundedBoxGeometry(1.8, h, 1.8, 5, 0.1));
-    const capGeo = track(new RoundedBoxGeometry(1.86, 0.07, 1.86, 3, 0.03));
-    const coinGeo = track(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 64));
-    coinGeo.rotateX(Math.PI / 2); // face the camera
-    const ringGeo = track(new THREE.TorusGeometry(0.4, 0.022, 12, 64));
-    const faceGeo = track(new THREE.CircleGeometry(0.4, 48));
-    const frontGeo = track(new THREE.PlaneGeometry(1.1, 1.1));
+    const blobGeo = track(new THREE.PlaneGeometry(3.4, 3.4));
+    const blobMat = track(
+      new THREE.MeshBasicMaterial({ map: makeTex(256, paintBlob), transparent: true, depthWrite: false })
+    );
 
-    const coins: { group: THREE.Group; baseY: number }[] = [];
+    // Shared geometry.
+    const R = 0.95;
+    const bodyGeo = (h: number) => track(new THREE.CylinderGeometry(R, R, h, 96));
+    const plinthGeo = track(new THREE.CylinderGeometry(R + 0.06, R + 0.1, 0.08, 96));
+    const rimGeo = track(new THREE.TorusGeometry(R - 0.035, 0.05, 20, 96));
+    const bandGeo = track(new THREE.TorusGeometry(R + 0.004, 0.022, 16, 96));
+    const inlayGeo = track(new THREE.TorusGeometry(0.62, 0.014, 12, 96));
+    const medalBodyGeo = track(new THREE.CylinderGeometry(0.47, 0.47, 0.1, 64));
+    medalBodyGeo.rotateX(Math.PI / 2); // face the camera
+    const medalRimGeo = track(new THREE.TorusGeometry(0.47, 0.05, 20, 64));
+    const faceGeo = track(new THREE.CircleGeometry(0.425, 64));
+    const orbitGeo = track(new THREE.TorusGeometry(0.86, 0.006, 8, 160));
+    const beadGeo = track(new THREE.SphereGeometry(0.035, 20, 20));
+    const glowGeo = track(new THREE.PlaneGeometry(2.6, 2.6));
+    const dotTex = makeTex(64, paintDot);
+
+    type Medal = {
+      float: THREE.Group;
+      spin: THREE.Group;
+      precess: THREE.Group;
+      bead: THREE.Group;
+      baseY: number;
+    };
+    const medals: Medal[] = [];
 
     podium.forEach((entry, i) => {
       const slot = SLOTS[i];
+      const h = slot.height;
       const mine = meId !== null && String(entry.id) === meId;
 
-      const blockMat = track(
-        new THREE.MeshStandardMaterial({
-          color: mine ? 0xe3e4fc : 0xf7f8fb,
-          roughness: 0.6,
+      const ceramic = track(
+        new THREE.MeshPhysicalMaterial({
+          color: mine ? 0xe4e6ff : 0xffffff,
+          roughness: 0.5,
           metalness: 0,
-          envMapIntensity: 0.35,
+          clearcoat: 0.6,
+          clearcoatRoughness: 0.35,
+          envMapIntensity: 0.5,
         })
       );
-      const block = new THREE.Mesh(blockGeo(slot.height), blockMat);
-      block.position.set(slot.x, slot.height / 2, 0);
-      block.castShadow = true;
-      block.receiveShadow = true;
-      stage.add(block);
-
-      // Thin medal-colored cap on top of the block.
+      const plinthMat = track(
+        new THREE.MeshStandardMaterial({ color: 0xe6e8f1, roughness: 0.6, envMapIntensity: 0.4 })
+      );
       const metal = track(
-        new THREE.MeshStandardMaterial({ color: slot.color, metalness: 0.9, roughness: 0.25 })
+        new THREE.MeshStandardMaterial({
+          color: slot.color,
+          metalness: 0.92,
+          roughness: 0.24,
+          emissive: slot.color,
+          emissiveIntensity: 0.1,
+        })
       );
-      const cap = new THREE.Mesh(capGeo, metal);
-      cap.position.set(slot.x, slot.height + 0.02, 0);
-      cap.castShadow = true;
-      stage.add(cap);
 
-      // Place numeral on the front of the block.
-      const frontTex = track(
-        numeralTexture(slot.n, fontFamily, { fill: `${slot.hex}` })
-      );
-      const front = new THREE.Mesh(
-        frontGeo,
+      // Pedestal: ceramic cylinder, rounded top lip, medal-colored band and inlay.
+      const ped = new THREE.Group();
+      ped.position.x = slot.x;
+      const body = new THREE.Mesh(bodyGeo(h), ceramic);
+      body.position.y = h / 2;
+      const plinth = new THREE.Mesh(plinthGeo, plinthMat);
+      plinth.position.y = 0.04;
+      const rim = new THREE.Mesh(rimGeo, ceramic);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = h;
+      const band = new THREE.Mesh(bandGeo, metal);
+      band.rotation.x = Math.PI / 2;
+      band.position.y = h - 0.22;
+      const inlay = new THREE.Mesh(inlayGeo, metal);
+      inlay.rotation.x = Math.PI / 2;
+      inlay.position.y = h + 0.006;
+      [body, plinth, rim, band, inlay].forEach((m) => {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      });
+      ped.add(body, plinth, rim, band, inlay);
+
+      // Place number wrapped onto the front of the pedestal.
+      const plateH = Math.min(0.85, h * 0.5);
+      const plateLen = plateH / R;
+      const plate = new THREE.Mesh(
+        track(new THREE.CylinderGeometry(R + 0.004, R + 0.004, plateH, 48, 1, true, -plateLen / 2, plateLen)),
         track(
           new THREE.MeshBasicMaterial({
-            map: frontTex,
+            map: makeTex(512, paintPlate(slot.n, fontFamily, slot.hex)),
             transparent: true,
-            opacity: 0.55,
             depthWrite: false,
           })
         )
       );
-      front.position.set(slot.x, Math.max(0.45, slot.height / 2 - 0.05), 0.906);
-      stage.add(front);
+      plate.position.y = (h - 0.3) / 2;
+      ped.add(plate);
+      stage.add(ped);
 
-      // Coin: metal body, raised rim, engraved place numeral on both faces.
-      const faceTex = track(
-        numeralTexture(slot.n, fontFamily, { background: "#ffffff", fill: "rgba(70,50,10,0.55)" })
-      );
+      const blob = new THREE.Mesh(blobGeo, blobMat);
+      blob.rotation.x = -Math.PI / 2;
+      blob.position.set(slot.x, 0.003, 0.05);
+      stage.add(blob);
+
+      // Medal: beveled disc with engraved number, soft glow, and an orbiting ring.
       const faceMat = track(
         new THREE.MeshStandardMaterial({
           color: slot.color,
-          map: faceTex,
-          metalness: 0.85,
-          roughness: 0.3,
+          map: makeTex(1024, paintMedalFace(slot.n, fontFamily)),
+          metalness: 0.9,
+          roughness: 0.28,
         })
       );
-      const group = new THREE.Group();
-      const coin = new THREE.Mesh(coinGeo, metal);
-      coin.castShadow = true;
-      const ring = new THREE.Mesh(ringGeo, metal);
-      ring.position.z = 0.052;
-      const ringBack = ring.clone();
-      ringBack.position.z = -0.052;
-      const faceFront = new THREE.Mesh(faceGeo, faceMat);
-      faceFront.position.z = 0.0515;
-      const faceBack = new THREE.Mesh(faceGeo, faceMat);
-      faceBack.position.z = -0.0515;
-      faceBack.rotation.y = Math.PI;
-      group.add(coin, ring, ringBack, faceFront, faceBack);
+      const spin = new THREE.Group();
+      const medalBody = new THREE.Mesh(medalBodyGeo, metal);
+      const medalRim = new THREE.Mesh(medalRimGeo, metal);
+      const faceF = new THREE.Mesh(faceGeo, faceMat);
+      faceF.position.z = 0.0505;
+      const faceB = new THREE.Mesh(faceGeo, faceMat);
+      faceB.position.z = -0.0505;
+      faceB.rotation.y = Math.PI;
+      [medalBody, medalRim].forEach((m) => (m.castShadow = true));
+      spin.add(medalBody, medalRim, faceF, faceB);
+      spin.rotation.y = reduceMotion ? (i - 1) * 0.3 : i * 1.1;
 
-      const baseY = slot.height + 0.95;
-      group.position.set(slot.x, baseY, 0);
-      group.rotation.y = i * 1.1;
-      stage.add(group);
-      coins.push({ group, baseY });
+      const glow = new THREE.Mesh(
+        glowGeo,
+        track(
+          new THREE.MeshBasicMaterial({
+            map: makeTex(256, paintGlow(slot.hex)),
+            transparent: true,
+            depthWrite: false,
+          })
+        )
+      );
+      glow.position.z = -0.35;
+
+      const precess = new THREE.Group();
+      const tilt = new THREE.Group();
+      tilt.rotation.x = 1.2 + i * 0.08;
+      const orbit = new THREE.Mesh(orbitGeo, metal);
+      const bead = new THREE.Group();
+      const beadMesh = new THREE.Mesh(beadGeo, metal);
+      beadMesh.position.x = 0.86;
+      bead.add(beadMesh);
+      tilt.add(orbit, bead);
+      precess.add(tilt);
+      precess.rotation.y = i;
+
+      const float = new THREE.Group();
+      const baseY = h + 0.98;
+      float.position.set(slot.x, baseY, 0);
+      float.add(glow, spin, precess);
+      stage.add(float);
+      medals.push({ float, spin, precess, bead, baseY });
     });
 
-    // Subtle pointer parallax.
+    // Slow rising gold dust around the podium.
+    const SPARKS = 40;
+    const sparkGeo = track(new THREE.BufferGeometry());
+    const sparkPos = new Float32Array(SPARKS * 3);
+    const sparkBaseX = new Float32Array(SPARKS);
+    const sparkSpeed = new Float32Array(SPARKS);
+    const sparkPhase = new Float32Array(SPARKS);
+    for (let i = 0; i < SPARKS; i++) {
+      sparkBaseX[i] = (Math.random() - 0.5) * 6;
+      sparkPos[i * 3] = sparkBaseX[i];
+      sparkPos[i * 3 + 1] = 1 + Math.random() * 3.8;
+      sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 1.6;
+      sparkSpeed[i] = 0.08 + Math.random() * 0.14;
+      sparkPhase[i] = Math.random() * Math.PI * 2;
+    }
+    sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+    const sparks = new THREE.Points(
+      sparkGeo,
+      track(
+        new THREE.PointsMaterial({
+          map: dotTex,
+          color: 0xe2b93b,
+          size: 0.07,
+          transparent: true,
+          opacity: 0.85,
+          depthWrite: false,
+        })
+      )
+    );
+    stage.add(sparks);
+
+    // Redraw the numerals once the web font is ready so they are crisp.
+    document.fonts
+      .load(`700 64px ${fontFamily}`)
+      .then(() => {
+        if (!cancelled) repaints.forEach((r) => r());
+      })
+      .catch(() => {});
+
+    // Subtle pointer parallax, with a slow idle sway when nobody is hovering.
     let targetRot = 0;
+    let pointerActive = false;
     const onPointer = (e: PointerEvent) => {
+      pointerActive = true;
       const r = wrap.getBoundingClientRect();
       targetRot = ((e.clientX - r.left) / r.width - 0.5) * 0.5;
     };
     const onLeave = () => {
+      pointerActive = false;
       targetRot = 0;
     };
     wrap.addEventListener("pointermove", onPointer);
@@ -248,7 +437,7 @@ function PodiumScene({
       h = wrap.clientHeight;
       renderer.setSize(w, h);
       camera.aspect = w / h;
-      camera.position.set(0, 3.2, Math.max(9, 12 / camera.aspect));
+      camera.position.set(0, 3.6, Math.max(9.6, 13 / camera.aspect));
       camera.lookAt(0, 2.0, 0);
       camera.updateProjectionMatrix();
     };
@@ -258,25 +447,39 @@ function PodiumScene({
 
     const clock = new THREE.Clock();
     let raf = 0;
+    let last = 0;
 
     const frame = () => {
       const t = clock.getElapsedTime();
+      const dt = Math.min(t - last, 0.05);
+      last = t;
 
       if (!reduceMotion) {
-        stage.rotation.y += (targetRot - stage.rotation.y) * 0.05;
-        coins.forEach(({ group, baseY }, i) => {
-          group.rotation.y = t * 1.1 + i * 1.1;
-          group.position.y = baseY + Math.sin(t * 1.5 + i) * 0.08;
+        const sway = pointerActive ? 0 : Math.sin(t * 0.45) * 0.12;
+        stage.rotation.y += (targetRot + sway - stage.rotation.y) * 0.05;
+        medals.forEach((m, i) => {
+          m.float.position.y = m.baseY + Math.sin(t * 1.5 + i) * 0.08;
+          m.spin.rotation.y = t * 0.9 + i * 1.1;
+          m.precess.rotation.y = t * 0.25 + i;
+          m.bead.rotation.z = t * 1.4 + i * 2;
         });
+        const pos = sparkGeo.attributes.position as THREE.BufferAttribute;
+        for (let i = 0; i < SPARKS; i++) {
+          let y = pos.getY(i) + sparkSpeed[i] * dt;
+          if (y > 4.8) y = 1;
+          pos.setY(i, y);
+          pos.setX(i, sparkBaseX[i] + Math.sin(t * 0.6 + sparkPhase[i]) * 0.12);
+        }
+        pos.needsUpdate = true;
       }
 
       renderer.render(scene, camera);
 
-      // Pin the HTML labels above each coin, kept inside the frame.
-      coins.forEach(({ group }, i) => {
+      // Pin the HTML labels above each medal, kept inside the frame.
+      medals.forEach(({ float }, i) => {
         const el = labelRefs.current[i];
         if (!el) return;
-        v.set(group.position.x, group.position.y + 0.72, 0);
+        v.set(float.position.x, float.position.y + 0.98, 0);
         stage.localToWorld(v);
         v.project(camera);
         const lw = el.offsetWidth;
@@ -292,6 +495,7 @@ function PodiumScene({
     frame();
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       wrap.removeEventListener("pointermove", onPointer);
@@ -305,7 +509,7 @@ function PodiumScene({
   return (
     <div
       ref={wrapRef}
-      className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-gray-200 bg-[radial-gradient(ellipse_at_50%_0%,#EEF0FF_0%,#FFFFFF_55%,#F3F4F8_100%)] shadow-sm sm:h-[420px]"
+      className="relative h-[380px] w-full overflow-hidden rounded-2xl border border-gray-200 bg-[radial-gradient(ellipse_at_50%_0%,#EEF0FF_0%,#FFFFFF_55%,#F3F4F8_100%)] shadow-sm sm:h-[440px]"
       role="img"
       aria-label={`Top three: ${podium.map((p, i) => `${SLOTS[i].label} ${p.username}`).join(", ")}`}
     >
@@ -385,7 +589,7 @@ function Skeleton() {
         <div className="mx-auto h-9 w-48 rounded-lg bg-gray-200" />
         <div className="mx-auto mt-3 h-4 w-64 rounded bg-gray-200" />
         <div className="mt-8 h-20 rounded-xl border border-gray-200 bg-white" />
-        <div className="mt-6 h-[360px] rounded-2xl border border-gray-200 bg-white sm:h-[420px]" />
+        <div className="mt-6 h-[360px] rounded-2xl border border-gray-200 bg-white sm:h-[440px]" />
         <div className="mt-8 space-y-px overflow-hidden rounded-xl border border-gray-200 bg-white">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
