@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { Space_Grotesk } from "next/font/google";
 import { getLeaderboard, resolveAvatarUrl, type LeaderboardEntry } from "../../lib/api";
@@ -32,11 +31,6 @@ const mix = (hex: string, to: number, amt: number) => {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 };
 
-const rgba = (hex: string, a: number) => {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-};
-
 /** Square canvas texture that can be repainted (used once the web font has loaded). */
 function canvasTexture(
   size: number,
@@ -57,6 +51,30 @@ function canvasTexture(
   };
   repaint();
   return { tex, repaint };
+}
+
+/** Fine grain used as a roughness map so the ceramic reflects unevenly, like a real surface. */
+function grainTexture(anisotropy: number) {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 175 + Math.random() * 80;
+    img.data[i] = v;
+    img.data[i + 1] = v;
+    img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(10, 3);
+  tex.anisotropy = anisotropy;
+  return tex;
 }
 
 const paintMedalFace = (n: string, font: string) => (ctx: CanvasRenderingContext2D, s: number) => {
@@ -81,6 +99,26 @@ const paintMedalFace = (n: string, font: string) => (ctx: CanvasRenderingContext
   ctx.fillText(n, s / 2, s / 2 + s * 0.03);
 };
 
+/** Height map for the medal face: the rings and numeral read as raised metal. */
+const paintMedalBump = (n: string, font: string) => (ctx: CanvasRenderingContext2D, s: number) => {
+  ctx.fillStyle = "#808080";
+  ctx.fillRect(0, 0, s, s);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = s * 0.016;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.44, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = s * 0.008;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s * 0.405, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.font = `700 ${s * 0.54}px ${font}, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(n, s / 2, s / 2 + s * 0.03);
+};
+
 const paintPlate = (n: string, font: string, hex: string) => (ctx: CanvasRenderingContext2D, s: number) => {
   ctx.font = `700 ${s * 0.8}px ${font}, system-ui, sans-serif`;
   ctx.textAlign = "center";
@@ -92,20 +130,12 @@ const paintPlate = (n: string, font: string, hex: string) => (ctx: CanvasRenderi
   ctx.fillText(n, s / 2, s / 2 + s * 0.04);
 };
 
-const paintGlow = (hex: string) => (ctx: CanvasRenderingContext2D, s: number) => {
+/** Soft ground shadow. A wide faint one plus a tight dark one gives believable contact shading. */
+const paintBlob = (alpha: number) => (ctx: CanvasRenderingContext2D, s: number) => {
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, rgba(hex, 0.5));
-  g.addColorStop(0.5, rgba(hex, 0.14));
-  g.addColorStop(1, rgba(hex, 0));
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-};
-
-const paintBlob = (ctx: CanvasRenderingContext2D, s: number) => {
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(30,27,75,0.30)");
-  g.addColorStop(0.6, "rgba(30,27,75,0.08)");
-  g.addColorStop(1, "rgba(30,27,75,0)");
+  g.addColorStop(0, `rgba(20,20,40,${alpha})`);
+  g.addColorStop(0.65, `rgba(20,20,40,${alpha * 0.5})`);
+  g.addColorStop(1, "rgba(20,20,40,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
 };
@@ -118,6 +148,71 @@ const paintDot = (ctx: CanvasRenderingContext2D, s: number) => {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
 };
+
+const PED_R = 0.95;
+const MEDAL_R = 0.47;
+
+/**
+ * Pedestal as one lathed profile: stepped plinth, straight body and a rounded top lip,
+ * so every edge catches light the way a machined or cast part would.
+ */
+function pedestalGeometry(h: number) {
+  const R = PED_R;
+  const lip = 0.12;
+  const pts: THREE.Vector2[] = [];
+  const P = (x: number, y: number) => pts.push(new THREE.Vector2(x, y));
+  P(0, 0);
+  P(R + 0.1, 0);
+  P(R + 0.1, 0.05);
+  P(R + 0.085, 0.09);
+  P(R + 0.04, 0.11);
+  P(R, 0.15);
+  P(R, h - lip);
+  const steps = 10;
+  for (let k = 1; k <= steps; k++) {
+    const a = (k / steps) * (Math.PI / 2);
+    P(R - lip + Math.cos(a) * lip, h - lip + Math.sin(a) * lip);
+  }
+  P(0, h);
+  return new THREE.LatheGeometry(pts, 128);
+}
+
+/** Coin with a raised, beveled rim, a recessed field and a milled (reeded) edge. */
+function coinGeometry() {
+  const R = MEDAL_R;
+  const t = 0.06; // rim half-thickness
+  const tf = 0.038; // field half-thickness
+  const rf = 0.4; // field radius
+  const bevel = 0.016;
+  const pts: THREE.Vector2[] = [];
+  const P = (x: number, y: number) => pts.push(new THREE.Vector2(x, y));
+  P(0, -tf);
+  P(rf, -tf);
+  P(rf + 0.03, -t);
+  P(R - bevel, -t);
+  P(R, -t + bevel);
+  P(R, t - bevel);
+  P(R - bevel, t);
+  P(rf + 0.03, t);
+  P(rf, tf);
+  P(0, tf);
+
+  const geo = new THREE.LatheGeometry(pts, 192);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const RIDGES = 48;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    if (Math.hypot(x, z) > R - 1e-4) {
+      const k = 1 + 0.02 * Math.cos(Math.atan2(z, x) * RIDGES);
+      pos.setX(i, x * k);
+      pos.setZ(i, z * k);
+    }
+  }
+  geo.computeVertexNormals();
+  geo.rotateX(Math.PI / 2); // coin faces the camera
+  return geo;
+}
 
 function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
   const url = resolveAvatarUrl(entry.avatar);
@@ -139,9 +234,10 @@ function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
 }
 
 /**
- * Three stepped blocks with a spinning, floating coin above each one.
- * Names and scores are HTML labels pinned to the coins, so avatars load
- * as normal images (no CORS needed) and text stays crisp.
+ * Three pedestals with a spinning, floating medal above each one. The scene renders on a
+ * transparent canvas so it sits directly on the page, with no frame around it.
+ * Names and scores are HTML labels pinned to the medals, so avatars load as normal
+ * images (no CORS needed) and text stays crisp.
  */
 function PodiumScene({
   podium,
@@ -176,6 +272,9 @@ function PodiumScene({
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Filmic tone mapping keeps highlights on the metal from clipping to flat white.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.domElement.style.display = "block";
@@ -192,61 +291,65 @@ function PodiumScene({
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
 
-    // Studio-style reflections so the metal reads as real gold, silver and bronze.
+    // Studio reflections so the metal reads as real gold, silver and bronze.
     const pmrem = track(new THREE.PMREMGenerator(renderer));
     const envRT = track(pmrem.fromScene(new RoomEnvironment(), 0.04));
     scene.environment = envRT.texture;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xe4e7f2, 0.55));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(3, 7, 6);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.radius = 5;
-    sun.shadow.bias = -0.0004;
-    Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 });
-    scene.add(sun);
+    // Warm key light with soft shadows, a cool rim light for edge highlights, gentle fill.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xdfe3ee, 0.35));
+    const key = new THREE.DirectionalLight(0xfff3e0, 2.1);
+    key.position.set(4, 8, 6);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.bias = -0.0003;
+    key.shadow.normalBias = 0.02;
+    Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 2, far: 22 });
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xdfe8ff, 0.9);
+    rim.position.set(-5, 4, -4);
+    scene.add(rim);
 
     const stage = new THREE.Group();
     scene.add(stage);
 
-    // Ground that only receives the shadows, plus a soft contact shadow under each pedestal.
+    // Ground that only receives shadows, so the podium sits on the page itself.
     const ground = new THREE.Mesh(
       track(new THREE.PlaneGeometry(20, 20)),
-      track(new THREE.ShadowMaterial({ opacity: 0.07 }))
+      track(new THREE.ShadowMaterial({ opacity: 0.18 }))
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     stage.add(ground);
 
-    const blobGeo = track(new THREE.PlaneGeometry(3.4, 3.4));
-    const blobMat = track(
-      new THREE.MeshBasicMaterial({ map: makeTex(256, paintBlob), transparent: true, depthWrite: false })
+    const blobWideGeo = track(new THREE.PlaneGeometry(3.8, 3.8));
+    const blobWideMat = track(
+      new THREE.MeshBasicMaterial({
+        map: makeTex(256, paintBlob(0.2)),
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      })
+    );
+    const blobTightGeo = track(new THREE.PlaneGeometry(2.9, 2.9));
+    const blobTightMat = track(
+      new THREE.MeshBasicMaterial({
+        map: makeTex(256, paintBlob(0.5)),
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      })
     );
 
-    // Shared geometry.
-    const R = 0.95;
-    const bodyGeo = (h: number) => track(new THREE.CylinderGeometry(R, R, h, 96));
-    const plinthGeo = track(new THREE.CylinderGeometry(R + 0.06, R + 0.1, 0.08, 96));
-    const rimGeo = track(new THREE.TorusGeometry(R - 0.035, 0.05, 20, 96));
-    const bandGeo = track(new THREE.TorusGeometry(R + 0.004, 0.022, 16, 96));
-    const inlayGeo = track(new THREE.TorusGeometry(0.62, 0.014, 12, 96));
-    const medalBodyGeo = track(new THREE.CylinderGeometry(0.47, 0.47, 0.1, 64));
-    medalBodyGeo.rotateX(Math.PI / 2); // face the camera
-    const medalRimGeo = track(new THREE.TorusGeometry(0.47, 0.05, 20, 64));
-    const faceGeo = track(new THREE.CircleGeometry(0.425, 64));
-    const orbitGeo = track(new THREE.TorusGeometry(0.86, 0.006, 8, 160));
-    const beadGeo = track(new THREE.SphereGeometry(0.035, 20, 20));
-    const glowGeo = track(new THREE.PlaneGeometry(2.6, 2.6));
+    // Shared geometry and textures.
+    const bandGeo = track(new THREE.TorusGeometry(PED_R + 0.004, 0.02, 16, 128));
+    const inlayGeo = track(new THREE.TorusGeometry(0.62, 0.014, 12, 128));
+    const coinGeo = track(coinGeometry());
+    const faceGeo = track(new THREE.CircleGeometry(0.395, 64));
+    const grain = track(grainTexture(aniso));
     const dotTex = makeTex(64, paintDot);
 
-    type Medal = {
-      float: THREE.Group;
-      spin: THREE.Group;
-      precess: THREE.Group;
-      bead: THREE.Group;
-      baseY: number;
-    };
+    type Medal = { float: THREE.Group; spin: THREE.Group; baseY: number };
     const medals: Medal[] = [];
 
     podium.forEach((entry, i) => {
@@ -256,126 +359,109 @@ function PodiumScene({
 
       const ceramic = track(
         new THREE.MeshPhysicalMaterial({
-          color: mine ? 0xe4e6ff : 0xffffff,
+          color: mine ? 0xe4e6ff : 0xf7f7f9,
           roughness: 0.5,
+          roughnessMap: grain,
           metalness: 0,
-          clearcoat: 0.6,
-          clearcoatRoughness: 0.35,
-          envMapIntensity: 0.5,
+          clearcoat: 0.5,
+          clearcoatRoughness: 0.28,
+          envMapIntensity: 0.55,
         })
       );
-      const plinthMat = track(
-        new THREE.MeshStandardMaterial({ color: 0xe6e8f1, roughness: 0.6, envMapIntensity: 0.4 })
-      );
       const metal = track(
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshPhysicalMaterial({
           color: slot.color,
-          metalness: 0.92,
-          roughness: 0.24,
-          emissive: slot.color,
-          emissiveIntensity: 0.1,
+          metalness: 1,
+          roughness: 0.22,
+          clearcoat: 0.25,
+          clearcoatRoughness: 0.2,
+          envMapIntensity: 1.25,
         })
       );
 
-      // Pedestal: ceramic cylinder, rounded top lip, medal-colored band and inlay.
+      // Pedestal: lathed ceramic body, medal-colored band, and a thin metal inlay on top.
       const ped = new THREE.Group();
       ped.position.x = slot.x;
-      const body = new THREE.Mesh(bodyGeo(h), ceramic);
-      body.position.y = h / 2;
-      const plinth = new THREE.Mesh(plinthGeo, plinthMat);
-      plinth.position.y = 0.04;
-      const rim = new THREE.Mesh(rimGeo, ceramic);
-      rim.rotation.x = Math.PI / 2;
-      rim.position.y = h;
+      const body = new THREE.Mesh(track(pedestalGeometry(h)), ceramic);
       const band = new THREE.Mesh(bandGeo, metal);
       band.rotation.x = Math.PI / 2;
-      band.position.y = h - 0.22;
+      band.position.y = h - 0.26;
       const inlay = new THREE.Mesh(inlayGeo, metal);
       inlay.rotation.x = Math.PI / 2;
-      inlay.position.y = h + 0.006;
-      [body, plinth, rim, band, inlay].forEach((m) => {
+      inlay.position.y = h + 0.004;
+      [body, band, inlay].forEach((m) => {
         m.castShadow = true;
         m.receiveShadow = true;
       });
-      ped.add(body, plinth, rim, band, inlay);
+      ped.add(body, band, inlay);
 
-      // Place number wrapped onto the front of the pedestal.
+      // Place numeral as metallic lettering wrapped onto the front of the pedestal.
       const plateH = Math.min(0.85, h * 0.5);
-      const plateLen = plateH / R;
+      const plateLen = plateH / PED_R;
       const plate = new THREE.Mesh(
-        track(new THREE.CylinderGeometry(R + 0.004, R + 0.004, plateH, 48, 1, true, -plateLen / 2, plateLen)),
         track(
-          new THREE.MeshBasicMaterial({
+          new THREE.CylinderGeometry(PED_R + 0.004, PED_R + 0.004, plateH, 48, 1, true, -plateLen / 2, plateLen)
+        ),
+        track(
+          new THREE.MeshStandardMaterial({
             map: makeTex(512, paintPlate(slot.n, fontFamily, slot.hex)),
             transparent: true,
             depthWrite: false,
+            metalness: 0.85,
+            roughness: 0.32,
+            envMapIntensity: 1.1,
           })
         )
       );
-      plate.position.y = (h - 0.3) / 2;
+      plate.position.y = (h - 0.12) / 2;
+      plate.receiveShadow = true;
       ped.add(plate);
       stage.add(ped);
 
-      const blob = new THREE.Mesh(blobGeo, blobMat);
-      blob.rotation.x = -Math.PI / 2;
-      blob.position.set(slot.x, 0.003, 0.05);
-      stage.add(blob);
+      const blobWide = new THREE.Mesh(blobWideGeo, blobWideMat);
+      blobWide.rotation.x = -Math.PI / 2;
+      blobWide.position.set(slot.x, 0.002, 0.05);
+      const blobTight = new THREE.Mesh(blobTightGeo, blobTightMat);
+      blobTight.rotation.x = -Math.PI / 2;
+      blobTight.position.set(slot.x, 0.003, 0.02);
+      stage.add(blobWide, blobTight);
 
-      // Medal: beveled disc with engraved number, soft glow, and an orbiting ring.
+      // Medal: beveled coin with a reeded edge and an embossed numeral on both faces.
+      const faceTex = makeTex(1024, paintMedalFace(slot.n, fontFamily));
+      const bumpTex = makeTex(1024, paintMedalBump(slot.n, fontFamily));
+      bumpTex.colorSpace = THREE.NoColorSpace;
       const faceMat = track(
-        new THREE.MeshStandardMaterial({
+        new THREE.MeshPhysicalMaterial({
           color: slot.color,
-          map: makeTex(1024, paintMedalFace(slot.n, fontFamily)),
-          metalness: 0.9,
-          roughness: 0.28,
+          map: faceTex,
+          bumpMap: bumpTex,
+          bumpScale: 0.6,
+          metalness: 1,
+          roughness: 0.3,
+          envMapIntensity: 1.25,
         })
       );
       const spin = new THREE.Group();
-      const medalBody = new THREE.Mesh(medalBodyGeo, metal);
-      const medalRim = new THREE.Mesh(medalRimGeo, metal);
+      const coin = new THREE.Mesh(coinGeo, metal);
+      coin.castShadow = true;
       const faceF = new THREE.Mesh(faceGeo, faceMat);
-      faceF.position.z = 0.0505;
+      faceF.position.z = 0.039;
       const faceB = new THREE.Mesh(faceGeo, faceMat);
-      faceB.position.z = -0.0505;
+      faceB.position.z = -0.039;
       faceB.rotation.y = Math.PI;
-      [medalBody, medalRim].forEach((m) => (m.castShadow = true));
-      spin.add(medalBody, medalRim, faceF, faceB);
+      spin.add(coin, faceF, faceB);
       spin.rotation.y = reduceMotion ? (i - 1) * 0.3 : i * 1.1;
-
-      const glow = new THREE.Mesh(
-        glowGeo,
-        track(
-          new THREE.MeshBasicMaterial({
-            map: makeTex(256, paintGlow(slot.hex)),
-            transparent: true,
-            depthWrite: false,
-          })
-        )
-      );
-      glow.position.z = -0.35;
-
-      const precess = new THREE.Group();
-      const tilt = new THREE.Group();
-      tilt.rotation.x = 1.2 + i * 0.08;
-      const orbit = new THREE.Mesh(orbitGeo, metal);
-      const bead = new THREE.Group();
-      const beadMesh = new THREE.Mesh(beadGeo, metal);
-      beadMesh.position.x = 0.86;
-      bead.add(beadMesh);
-      tilt.add(orbit, bead);
-      precess.add(tilt);
-      precess.rotation.y = i;
 
       const float = new THREE.Group();
       const baseY = h + 0.98;
       float.position.set(slot.x, baseY, 0);
-      float.add(glow, spin, precess);
+      float.add(spin);
       stage.add(float);
-      medals.push({ float, spin, precess, bead, baseY });
+      medals.push({ float, spin, baseY });
     });
 
-    // Slow rising gold dust around the podium.
-    const SPARKS = 40;
+    // Faint dust motes drifting up through the light.
+    const SPARKS = 28;
     const sparkGeo = track(new THREE.BufferGeometry());
     const sparkPos = new Float32Array(SPARKS * 3);
     const sparkBaseX = new Float32Array(SPARKS);
@@ -386,7 +472,7 @@ function PodiumScene({
       sparkPos[i * 3] = sparkBaseX[i];
       sparkPos[i * 3 + 1] = 1 + Math.random() * 3.8;
       sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 1.6;
-      sparkSpeed[i] = 0.08 + Math.random() * 0.14;
+      sparkSpeed[i] = 0.06 + Math.random() * 0.1;
       sparkPhase[i] = Math.random() * Math.PI * 2;
     }
     sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
@@ -395,11 +481,12 @@ function PodiumScene({
       track(
         new THREE.PointsMaterial({
           map: dotTex,
-          color: 0xe2b93b,
-          size: 0.07,
+          color: 0xf0d27a,
+          size: 0.055,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.6,
           depthWrite: false,
+          toneMapped: false,
         })
       )
     );
@@ -460,8 +547,6 @@ function PodiumScene({
         medals.forEach((m, i) => {
           m.float.position.y = m.baseY + Math.sin(t * 1.5 + i) * 0.08;
           m.spin.rotation.y = t * 0.9 + i * 1.1;
-          m.precess.rotation.y = t * 0.25 + i;
-          m.bead.rotation.z = t * 1.4 + i * 2;
         });
         const pos = sparkGeo.attributes.position as THREE.BufferAttribute;
         for (let i = 0; i < SPARKS; i++) {
@@ -509,7 +594,7 @@ function PodiumScene({
   return (
     <div
       ref={wrapRef}
-      className="relative h-[380px] w-full overflow-hidden rounded-2xl border border-gray-200 bg-[radial-gradient(ellipse_at_50%_0%,#EEF0FF_0%,#FFFFFF_55%,#F3F4F8_100%)] shadow-sm sm:h-[440px]"
+      className="relative h-[380px] w-full sm:h-[440px]"
       role="img"
       aria-label={`Top three: ${podium.map((p, i) => `${SLOTS[i].label} ${p.username}`).join(", ")}`}
     >
@@ -523,8 +608,8 @@ function PodiumScene({
                 labelRefs.current[i] = el;
               }}
               style={{ opacity: 0 }}
-              className={`absolute left-0 top-0 flex items-center gap-2.5 rounded-xl border bg-white/95 px-2.5 py-2 shadow-[0_6px_20px_-6px_rgba(17,24,39,0.2)] backdrop-blur transition-opacity duration-500 ${
-                mine ? "border-[#4F46E5] ring-2 ring-[#4F46E5]/15" : "border-gray-200"
+              className={`absolute left-0 top-0 flex items-center gap-2.5 rounded-xl px-2.5 py-2 shadow-[0_10px_28px_-10px_rgba(17,24,39,0.28)] backdrop-blur transition-opacity duration-500 ${
+                mine ? "bg-[#EEF0FF]/95" : "bg-white/95"
               }`}
             >
               <Avatar entry={entry} size="h-8 w-8 sm:h-9 sm:w-9" />
@@ -589,7 +674,7 @@ function Skeleton() {
         <div className="mx-auto h-9 w-48 rounded-lg bg-gray-200" />
         <div className="mx-auto mt-3 h-4 w-64 rounded bg-gray-200" />
         <div className="mt-8 h-20 rounded-xl border border-gray-200 bg-white" />
-        <div className="mt-6 h-[360px] rounded-2xl border border-gray-200 bg-white sm:h-[440px]" />
+        <div className="mt-6 h-[380px] rounded-2xl bg-gray-100/70 sm:h-[440px]" />
         <div className="mt-8 space-y-px overflow-hidden rounded-xl border border-gray-200 bg-white">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
