@@ -426,7 +426,7 @@ function PodiumScene({
       blobTight.position.set(slot.x, 0.003, 0.02);
       stage.add(blobWide, blobTight);
 
-      // Medal: beveled coin with a reeded edge and an embossed numeral on both faces.
+
       const faceTex = makeTex(1024, paintMedalFace(slot.n, fontFamily));
       const bumpTex = makeTex(1024, paintMedalBump(slot.n, fontFamily));
       bumpTex.colorSpace = THREE.NoColorSpace;
@@ -492,7 +492,7 @@ function PodiumScene({
     );
     stage.add(sparks);
 
-    // Redraw the numerals once the web font is ready so they are crisp.
+    
     document.fonts
       .load(`700 64px ${fontFamily}`)
       .then(() => {
@@ -500,7 +500,7 @@ function PodiumScene({
       })
       .catch(() => {});
 
-    // Subtle pointer parallax, with a slow idle sway when nobody is hovering.
+    
     let targetRot = 0;
     let pointerActive = false;
     const onPointer = (e: PointerEvent) => {
@@ -560,7 +560,7 @@ function PodiumScene({
 
       renderer.render(scene, camera);
 
-      // Pin the HTML labels above each medal, kept inside the frame.
+      
       medals.forEach(({ float }, i) => {
         const el = labelRefs.current[i];
         if (!el) return;
