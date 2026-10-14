@@ -1,6 +1,6 @@
 const pool = require("../db");
 
-exports.createGameSession = async (userId, configurationId) => {
+exports.createGameSession = async (userId, configurationId, customSettings = null) => {
   const result = await pool.query(
     `
     INSERT INTO game_sessions (
@@ -9,12 +9,13 @@ exports.createGameSession = async (userId, configurationId) => {
       score,
       started_at,
       ended_at,
-      is_finished
+      is_finished,
+      custom_settings
     )
-    VALUES ($1, $2, 0, NOW(), NULL, FALSE)
+    VALUES ($1, $2, 0, NOW(), NULL, FALSE, $3)
     RETURNING *
     `,
-    [userId, configurationId]
+    [userId, configurationId, customSettings]
   );
 
   return result.rows[0];
@@ -26,7 +27,8 @@ exports.getGameSession = async (sessionId) => {
     SELECT
       gs.*,
       c.level,
-      c.timer
+      c.is_custom,
+      COALESCE((gs.custom_settings->>'timer')::int, c.timer) AS timer
     FROM game_sessions gs
     JOIN configurations c
       ON gs.configuration_id = c.id
@@ -38,7 +40,25 @@ exports.getGameSession = async (sessionId) => {
   return result.rows[0];
 };
 
-exports.getRandomArithmetic = async (level) => {
+exports.getRandomArithmetic = async (level, customSettings = null) => {
+  // Custom level: build the rule from the player's own settings
+  if (customSettings) {
+    const ops = customSettings.operations;
+    const operation = ops[Math.floor(Math.random() * ops.length)];
+
+    return {
+      id: null,
+      name: `Custom ${operation}`,
+      operation,
+      left_min_digits: customSettings.left_min_digits,
+      left_max_digits: customSettings.left_max_digits,
+      right_min_digits: customSettings.right_min_digits,
+      right_max_digits: customSettings.right_max_digits,
+      decimal_places: customSettings.decimal_places,
+    };
+  }
+
+  // Normal levels: unchanged
   const result = await pool.query(
     `
     SELECT
@@ -78,7 +98,6 @@ exports.saveCurrentQuestion = async (sessionId, question, answer) => {
   return result.rows[0];
 };
 
-
 exports.getCurrentQuestion = async (sessionId) => {
   const result = await pool.query(
     `
@@ -107,6 +126,7 @@ exports.updateScore = async (sessionId, score) => {
 
   return result.rows[0];
 };
+
 exports.updateTopScore = async (userId, score) => {
   const result = await pool.query(
     `
@@ -126,6 +146,7 @@ exports.updateTopScore = async (userId, score) => {
 
   return result.rows[0];
 };
+
 exports.finishGame = async (sessionId) => {
   const result = await pool.query(
     `
