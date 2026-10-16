@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -19,120 +19,41 @@ interface OpponentInfo {
   avatar?: string | null;
 }
 
-function loadStoredDuel(duelId: string): Duel | null {
-  try {
-    const raw = sessionStorage.getItem(`duel:${duelId}`);
-    return raw ? (JSON.parse(raw) as Duel) : null;
-  } catch {
-    return null;
-  }
+interface QuestionResponse {
+  success?: boolean;
+  gameOver?: boolean;
+  question?: string | null;
+  player1Score?: number;
+  player2Score?: number;
+  remainingTime?: number;
+  winnerId?: string | number | null;
 }
 
 export default function DuelRoomPage() {
   const params = useParams<{ duelId: string }>();
-  const duelId = params.duelId;
+  const duelId = String(params.duelId);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [duelMeta, setDuelMeta] = useState<Duel | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
   const [opponent, setOpponent] = useState<OpponentInfo | null>(null);
-
   const [question, setQuestion] = useState<string | null>(null);
   const [myScore, setMyScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
-  const [opponentAnswered, setOpponentAnswered] = useState(false);
-  const [lastResult, setLastResult] = useState<"correct" | "wrong" | null>(
-    null
-  );
-
+  const [lastResult, setLastResult] = useState<"correct" | "wrong" | null>(null);
   const [gameOver, setGameOver] = useState(false);
-  const [winnerId, setWinnerId] = useState<string | null | undefined>(
-    undefined
-  );
-
+  const [winnerId, setWinnerId] = useState<string | null>(null);
   const [answerInput, setAnswerInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [waitingForOpponent, setWaitingForOpponent] = useState(false);
 
   const lastQuestionRef = useRef<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login");
-    }
-  }, [authLoading, user, router]);
-
-  // Load duel metadata from session storage or the backend.
-  useEffect(() => {
-    if (!duelId || authLoading || !user) return;
-
-    let cancelled = false;
-
-    async function loadDuel() {
-      setMetaError(null);
-      setDuelMeta(null);
-
-      try {
-        const stored = loadStoredDuel(duelId);
-
-        if (stored) {
-          const isParticipant =
-            String(stored.player1_id) === String(user.id) ||
-            String(stored.player2_id) === String(user.id);
-
-          if (
-            String(stored.id) === String(duelId) &&
-            isParticipant
-          ) {
-            if (!cancelled) {
-              setDuelMeta(stored);
-              return;
-            }
-          }
-        }
-
-        const response = await getDuelById(duelId);
-        const duel = response?.duel ?? response;
-
-        if (
-          !duel ||
-          String(duel.id) !== String(duelId) ||
-          (String(duel.player1_id) !== String(user.id) &&
-            String(duel.player2_id) !== String(user.id))
-        ) {
-          throw new Error(
-            "Duel not found, or you are not a participant in this duel."
-          );
-        }
-
-        if (!cancelled) {
-          setDuelMeta(duel as Duel);
-          sessionStorage.setItem(
-            `duel:${duelId}`,
-            JSON.stringify(duel)
-          );
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setMetaError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load duel details. Please return to the lobby."
-          );
-        }
-      }
-    }
-
-    loadDuel();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [duelId, authLoading, user]);
+  const answeredQuestionRef = useRef<string | null>(null);
+  const submittingRef = useRef(false);
+  const gameOverRef = useRef(false);
 
   const isPlayer1 = useMemo(
     () =>
@@ -146,33 +67,126 @@ export default function DuelRoomPage() {
     if (!duelMeta || !user) return null;
 
     return String(duelMeta.player1_id) === String(user.id)
-      ? duelMeta.player2_id
-      : duelMeta.player1_id;
+      ? String(duelMeta.player2_id)
+      : String(duelMeta.player1_id);
   }, [duelMeta, user]);
+
+  const applyScores = useCallback(
+    (res: QuestionResponse) => {
+      if (
+        typeof res.player1Score !== "number" ||
+        typeof res.player2Score !== "number"
+      ) {
+        return;
+      }
+
+      setMyScore(isPlayer1 ? res.player1Score : res.player2Score);
+      setOpponentScore(isPlayer1 ? res.player2Score : res.player1Score);
+    },
+    [isPlayer1]
+  );
+
+  const finishGame = useCallback(
+    (res: QuestionResponse) => {
+      gameOverRef.current = true;
+      setGameOver(true);
+      setWinnerId(
+        res.winnerId === undefined || res.winnerId === null
+          ? null
+          : String(res.winnerId)
+      );
+      applyScores(res);
+    },
+    [applyScores]
+  );
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (!duelId || authLoading || !user) return;
+
+    let cancelled = false;
+
+    async function loadDuel() {
+      try {
+        setMetaError(null);
+
+        const response = await getDuelById(duelId);
+        const duel = response?.duel ?? response;
+
+        if (
+          !duel ||
+          String(duel.id) !== duelId ||
+          (String(duel.player1_id) !== String(user.id) &&
+            String(duel.player2_id) !== String(user.id))
+        ) {
+          throw new Error("Duel not found, or you are not a participant.");
+        }
+
+        if (!cancelled) {
+          setDuelMeta(duel as Duel);
+          setMyScore(
+            String(duel.player1_id) === String(user.id)
+              ? Number(duel.player1_score ?? 0)
+              : Number(duel.player2_score ?? 0)
+          );
+          setOpponentScore(
+            String(duel.player1_id) === String(user.id)
+              ? Number(duel.player2_score ?? 0)
+              : Number(duel.player1_score ?? 0)
+          );
+
+          if (duel.is_finished) {
+            gameOverRef.current = true;
+            setGameOver(true);
+            setWinnerId(
+              duel.winner_id == null ? null : String(duel.winner_id)
+            );
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMetaError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load duel details."
+          );
+        }
+      }
+    }
+
+    loadDuel();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [duelId, authLoading, user]);
 
   useEffect(() => {
     if (!opponentId) return;
 
     let cancelled = false;
 
-    getUserById(String(opponentId))
+    getUserById(opponentId)
       .then((res) => {
-        const u =
-          (res as unknown as { user?: OpponentInfo })?.user ??
-          (res as unknown as OpponentInfo);
+        const data = res?.user ?? res;
 
         if (!cancelled) {
           setOpponent({
-            id: String(opponentId),
-            username: u.username ?? "Opponent",
-            avatar: u.avatar ?? null,
+            id: opponentId,
+            username: data?.username ?? "Opponent",
+            avatar: data?.avatar ?? null,
           });
         }
       })
       .catch(() => {
         if (!cancelled) {
           setOpponent({
-            id: String(opponentId),
+            id: opponentId,
             username: "Opponent",
             avatar: null,
           });
@@ -185,160 +199,161 @@ export default function DuelRoomPage() {
   }, [opponentId]);
 
   useEffect(() => {
-    if (!duelId || !duelMeta) return;
+    if (!duelId || !duelMeta || gameOver) return;
 
     let cancelled = false;
+    let polling = false;
 
     const poll = async () => {
-      try {
-        const res = await getDuelQuestion(duelId);
+      if (cancelled || polling || gameOverRef.current) return;
 
-        if (cancelled) return;
+      polling = true;
+
+      try {
+        const res = (await getDuelQuestion(duelId)) as QuestionResponse;
+
+        if (cancelled || gameOverRef.current) return;
 
         if (res.gameOver) {
-          setGameOver(true);
-          setWinnerId(res.winnerId ?? null);
-
-          if (typeof res.player1Score === "number") {
-            setMyScore(
-              isPlayer1 ? res.player1Score : res.player2Score ?? 0
-            );
-            setOpponentScore(
-              isPlayer1 ? res.player2Score ?? 0 : res.player1Score
-            );
-          }
-
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (tickRef.current) clearInterval(tickRef.current);
+          finishGame(res);
           return;
         }
 
-        if (typeof res.player1Score === "number") {
-          setMyScore(
-            isPlayer1 ? res.player1Score : res.player2Score ?? 0
-          );
-          setOpponentScore(
-            isPlayer1 ? res.player2Score ?? 0 : res.player1Score
-          );
-        }
+        applyScores(res);
 
         if (typeof res.remainingTime === "number") {
-          setRemainingTime(res.remainingTime);
+          setRemainingTime(Math.max(0, res.remainingTime));
         }
 
-        if (res.question && res.question !== lastQuestionRef.current) {
-          lastQuestionRef.current = res.question;
-          setQuestion(res.question);
-          setAnswered(false);
-          setOpponentAnswered(false);
-          setLastResult(null);
-          setAnswerInput("");
+        if (typeof res.question === "string" && res.question.length > 0) {
+          if (lastQuestionRef.current !== res.question) {
+            lastQuestionRef.current = res.question;
+            answeredQuestionRef.current = null;
+
+            setQuestion(res.question);
+            setAnswered(false);
+            setLastResult(null);
+            setAnswerInput("");
+            setWaitingForOpponent(false);
+          }
         }
-      } catch {
-        // Retry on the next poll.
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Unable to sync duel:", error);
+        }
+      } finally {
+        polling = false;
       }
     };
 
-    poll();
-    pollRef.current = setInterval(poll, 1200);
+    void poll();
+
+    const interval = setInterval(() => {
+      void poll();
+    }, 700);
 
     return () => {
       cancelled = true;
-      if (pollRef.current) clearInterval(pollRef.current);
+      clearInterval(interval);
     };
-  }, [duelId, duelMeta, isPlayer1]);
+  }, [duelId, duelMeta, gameOver, applyScores, finishGame]);
 
   useEffect(() => {
     if (gameOver || !duelMeta) return;
 
-    tickRef.current = setInterval(() => {
-      setRemainingTime((t) =>
-        t === null ? t : Math.max(0, t - 1)
+    const interval = setInterval(() => {
+      setRemainingTime((time) =>
+        time === null ? null : Math.max(0, time - 1)
       );
     }, 1000);
 
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
+    return () => clearInterval(interval);
   }, [gameOver, duelMeta]);
 
   const handleSubmit = async () => {
-    if (!duelId || !answerInput || answered || submitting) return;
+    const currentQuestion = lastQuestionRef.current;
 
+    if (
+      !duelId ||
+      !currentQuestion ||
+      !answerInput.trim() ||
+      !Number.isFinite(Number(answerInput)) ||
+      answered ||
+      submittingRef.current ||
+      gameOverRef.current
+    ) {
+      return;
+    }
+
+    submittingRef.current = true;
     setSubmitting(true);
 
     try {
-      const res = await submitDuelAnswer(
-        duelId,
-        Number(answerInput)
-      );
+      const res = await submitDuelAnswer(duelId, Number(answerInput));
 
       if (res.gameOver) {
-        setGameOver(true);
-        setWinnerId(res.winnerId ?? null);
-
-        if (typeof res.player1Score === "number") {
-          setMyScore(
-            isPlayer1 ? res.player1Score : res.player2Score ?? 0
-          );
-          setOpponentScore(
-            isPlayer1 ? res.player2Score ?? 0 : res.player1Score
-          );
-        }
-
+        finishGame(res);
         return;
       }
 
-      setAnswered(true);
-      setLastResult(res.correct ? "correct" : "wrong");
+      applyScores(res);
 
-      if (typeof res.score === "number") {
-        setMyScore(res.score);
+      if (res.success !== false) {
+        answeredQuestionRef.current = currentQuestion;
+        setAnswered(true);
+        setLastResult(res.correct ? "correct" : "wrong");
+        setWaitingForOpponent(true);
+
+        if (typeof res.score === "number") {
+          setMyScore(res.score);
+        }
+      } else {
+        const message = String(res.message ?? "");
+
+        if (
+          message.toLowerCase().includes("already answered") ||
+          message.toLowerCase().includes("already solved")
+        ) {
+          answeredQuestionRef.current = currentQuestion;
+          setAnswered(true);
+          setWaitingForOpponent(true);
+        } else {
+          console.error("Answer rejected:", message);
+        }
       }
-
-      setOpponentAnswered(!!res.opponentAnswered);
     } catch (error) {
       console.error("Failed to submit duel answer:", error);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
-  if (authLoading || !user) {
+  if (authLoading || !user || !duelMeta) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16">
-        <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
-      </div>
-    );
-  }
-
-  if (metaError) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-16 text-center">
-        <p className="text-sm text-gray-600">{metaError}</p>
-        <button
-          onClick={() => router.push("/duel")}
-          className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          Back to lobby
-        </button>
-      </div>
-    );
-  }
-
-  if (!duelMeta) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-16">
-        <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
+        {metaError ? (
+          <div className="text-center">
+            <p className="text-sm text-red-600">{metaError}</p>
+            <button
+              onClick={() => router.push("/duel")}
+              className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Back to lobby
+            </button>
+          </div>
+        ) : (
+          <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
+        )}
       </div>
     );
   }
 
   if (gameOver) {
     const outcome =
-      winnerId === undefined || winnerId === null
+      winnerId === null
         ? "draw"
-        : String(winnerId) === String(user.id)
+        : winnerId === String(user.id)
           ? "win"
           : "loss";
 
@@ -349,7 +364,7 @@ export default function DuelRoomPage() {
         </p>
 
         <h1
-          className={`mt-2 text-3xl font-bold tracking-tight ${
+          className={`mt-2 text-3xl font-bold ${
             outcome === "win"
               ? "text-emerald-600"
               : outcome === "loss"
@@ -366,16 +381,12 @@ export default function DuelRoomPage() {
 
         <div className="mx-auto mt-8 flex max-w-xs items-center justify-between">
           <div>
-            <p className="text-3xl font-bold text-gray-900">{myScore}</p>
+            <p className="text-3xl font-bold">{myScore}</p>
             <p className="text-xs text-gray-500">You</p>
           </div>
-
           <span className="text-gray-300">–</span>
-
           <div>
-            <p className="text-3xl font-bold text-gray-900">
-              {opponentScore}
-            </p>
+            <p className="text-3xl font-bold">{opponentScore}</p>
             <p className="text-xs text-gray-500">
               {opponent?.username ?? "Opponent"}
             </p>
@@ -384,7 +395,7 @@ export default function DuelRoomPage() {
 
         <button
           onClick={() => router.push("/duel")}
-          className="mt-10 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          className="mt-10 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white"
         >
           Back to lobby
         </button>
@@ -399,9 +410,7 @@ export default function DuelRoomPage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
             {user.username?.[0]?.toUpperCase() || "?"}
           </span>
-          <span className="text-lg font-bold text-gray-900">
-            {myScore}
-          </span>
+          <span className="text-lg font-bold">{myScore}</span>
         </div>
 
         <div className="rounded-full bg-gray-900 px-4 py-1.5 text-sm font-semibold tabular-nums text-white">
@@ -409,13 +418,9 @@ export default function DuelRoomPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-gray-900">
-            {opponentScore}
-          </span>
-
+          <span className="text-lg font-bold">{opponentScore}</span>
           <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-xs font-semibold text-gray-600">
             {opponent?.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={resolveAvatarUrl(opponent.avatar)}
                 alt=""
@@ -437,30 +442,54 @@ export default function DuelRoomPage() {
           <div className="mx-auto h-10 w-40 animate-pulse rounded-lg bg-gray-100" />
         )}
 
-        <div className="mt-8 flex items-center justify-center gap-3">
+        <form
+          className="mt-8 flex items-center justify-center gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSubmit();
+          }}
+        >
           <input
             type="number"
             inputMode="numeric"
             value={answerInput}
-            onChange={(e) => setAnswerInput(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && handleSubmit()
-            }
+            onChange={(event) => setAnswerInput(event.target.value)}
             disabled={answered || submitting || !question}
             placeholder="Your answer"
-            className="w-40 rounded-lg border border-gray-300 px-4 py-2.5 text-center text-lg font-semibold text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50"
+            className="w-40 rounded-lg border border-gray-300 px-4 py-2.5 text-center text-lg font-semibold outline-none focus:border-indigo-500 disabled:bg-gray-50"
           />
 
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={
-              answered || submitting || !question || !answerInput
+              answered ||
+              submitting ||
+              !question ||
+              !answerInput.trim()
             }
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {submitting ? "…" : "Submit"}
+            {submitting ? "Submitting…" : "Submit"}
           </button>
-        </div>
+        </form>
+
+        {lastResult && (
+          <p
+            className={`mt-4 text-sm font-semibold ${
+              lastResult === "correct"
+                ? "text-emerald-600"
+                : "text-red-500"
+            }`}
+          >
+            {lastResult === "correct" ? "Correct answer!" : "Incorrect answer"}
+          </p>
+        )}
+
+        {waitingForOpponent && (
+          <p className="mt-2 text-sm text-gray-500">
+            Waiting for your opponent to answer…
+          </p>
+        )}
       </div>
     </div>
   );
