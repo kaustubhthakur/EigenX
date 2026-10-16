@@ -102,6 +102,48 @@ exports.joinDuel = async (req, res) => {
   }
 };
 
+exports.getDuelById = async (req, res) => {
+  try {
+    const { duelId } = req.params;
+    const userId = req.user.id;
+
+    if (!isValidId(duelId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid duelId",
+      });
+    }
+
+    const duel = await Duel.getDuel(duelId);
+
+    if (!duel) {
+      return res.status(404).json({
+        success: false,
+        message: "Duel not found",
+      });
+    }
+
+    if (!getParticipant(duel, userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Not a participant in this duel",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      duel,
+    });
+  } catch (err) {
+    console.error("getDuelById error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve duel details",
+    });
+  }
+};
+
 exports.getDuelStatus = async (req, res) => {
   try {
     const queueEntry = await Duel.getQueueStatus(req.user.id);

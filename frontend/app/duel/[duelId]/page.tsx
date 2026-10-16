@@ -1,9 +1,16 @@
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";
-import { getDuelQuestion, getUserById, resolveAvatarUrl, submitDuelAnswer } from "../../../lib/api";
+import {
+  getDuelQuestion,
+  getDuelById,
+  getUserById,
+  resolveAvatarUrl,
+  submitDuelAnswer,
+} from "../../../lib/api";
 import type { Duel } from "../../../types/duel";
 
 interface OpponentInfo {
@@ -22,7 +29,8 @@ function loadStoredDuel(duelId: string): Duel | null {
 }
 
 export default function DuelRoomPage() {
-  const { duelId } = useParams<{ duelId: string }>();
+  const params = useParams<{ duelId: string }>();
+  const duelId = params.duelId;
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -36,10 +44,14 @@ export default function DuelRoomPage() {
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
   const [opponentAnswered, setOpponentAnswered] = useState(false);
-  const [lastResult, setLastResult] = useState<"correct" | "wrong" | null>(null);
+  const [lastResult, setLastResult] = useState<"correct" | "wrong" | null>(
+    null
+  );
 
   const [gameOver, setGameOver] = useState(false);
-  const [winnerId, setWinnerId] = useState<string | null | undefined>(undefined);
+  const [winnerId, setWinnerId] = useState<string | null | undefined>(
+    undefined
+  );
 
   const [answerInput, setAnswerInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -49,67 +61,170 @@ export default function DuelRoomPage() {
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) router.push("/login");
+    if (!authLoading && !user) {
+      router.push("/login");
+    }
   }, [authLoading, user, router]);
 
-
+  // Load duel metadata from session storage or the backend.
   useEffect(() => {
-    if (!duelId) return;
-    const stored = loadStoredDuel(duelId);
-    if (stored) {
-      setDuelMeta(stored);
-    } else {
-      setMetaError(
-        "Couldn't find this duel's details in this session. Head back to the lobby and rejoin."
-      );
+    if (!duelId || authLoading || !user) return;
+
+    let cancelled = false;
+
+    async function loadDuel() {
+      setMetaError(null);
+      setDuelMeta(null);
+
+      try {
+        const stored = loadStoredDuel(duelId);
+
+        if (stored) {
+          const isParticipant =
+            String(stored.player1_id) === String(user.id) ||
+            String(stored.player2_id) === String(user.id);
+
+          if (
+            String(stored.id) === String(duelId) &&
+            isParticipant
+          ) {
+            if (!cancelled) {
+              setDuelMeta(stored);
+              return;
+            }
+          }
+        }
+
+        const response = await getDuelById(duelId);
+        const duel = response?.duel ?? response;
+
+        if (
+          !duel ||
+          String(duel.id) !== String(duelId) ||
+          (String(duel.player1_id) !== String(user.id) &&
+            String(duel.player2_id) !== String(user.id))
+        ) {
+          throw new Error(
+            "Duel not found, or you are not a participant in this duel."
+          );
+        }
+
+        if (!cancelled) {
+          setDuelMeta(duel as Duel);
+          sessionStorage.setItem(
+            `duel:${duelId}`,
+            JSON.stringify(duel)
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMetaError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load duel details. Please return to the lobby."
+          );
+        }
+      }
     }
-  }, [duelId]);
+
+    loadDuel();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [duelId, authLoading, user]);
 
   const isPlayer1 = useMemo(
-    () => !!(duelMeta && user && duelMeta.player1_id === user.id),
+    () =>
+      !!duelMeta &&
+      !!user &&
+      String(duelMeta.player1_id) === String(user.id),
     [duelMeta, user]
   );
 
   const opponentId = useMemo(() => {
     if (!duelMeta || !user) return null;
-    return duelMeta.player1_id === user.id ? duelMeta.player2_id : duelMeta.player1_id;
+
+    return String(duelMeta.player1_id) === String(user.id)
+      ? duelMeta.player2_id
+      : duelMeta.player1_id;
   }, [duelMeta, user]);
 
   useEffect(() => {
     if (!opponentId) return;
-    getUserById(opponentId)
-      .then((res) => {
-        const u = (res as unknown as { user?: OpponentInfo })?.user ?? (res as unknown as OpponentInfo);
-        setOpponent({ id: opponentId, username: u.username, avatar: u.avatar ?? null });
-      })
-      .catch(() => setOpponent({ id: opponentId, username: "Opponent", avatar: null }));
-  }, [opponentId]);
 
+    let cancelled = false;
+
+    getUserById(String(opponentId))
+      .then((res) => {
+        const u =
+          (res as unknown as { user?: OpponentInfo })?.user ??
+          (res as unknown as OpponentInfo);
+
+        if (!cancelled) {
+          setOpponent({
+            id: String(opponentId),
+            username: u.username ?? "Opponent",
+            avatar: u.avatar ?? null,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpponent({
+            id: String(opponentId),
+            username: "Opponent",
+            avatar: null,
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [opponentId]);
 
   useEffect(() => {
     if (!duelId || !duelMeta) return;
+
+    let cancelled = false;
 
     const poll = async () => {
       try {
         const res = await getDuelQuestion(duelId);
 
+        if (cancelled) return;
+
         if (res.gameOver) {
           setGameOver(true);
           setWinnerId(res.winnerId ?? null);
+
           if (typeof res.player1Score === "number") {
-            setMyScore(isPlayer1 ? res.player1Score : res.player2Score ?? 0);
-            setOpponentScore(isPlayer1 ? res.player2Score ?? 0 : res.player1Score);
+            setMyScore(
+              isPlayer1 ? res.player1Score : res.player2Score ?? 0
+            );
+            setOpponentScore(
+              isPlayer1 ? res.player2Score ?? 0 : res.player1Score
+            );
           }
+
           if (pollRef.current) clearInterval(pollRef.current);
           if (tickRef.current) clearInterval(tickRef.current);
           return;
         }
 
         if (typeof res.player1Score === "number") {
-          setMyScore(isPlayer1 ? res.player1Score : res.player2Score ?? 0);
-          setOpponentScore(isPlayer1 ? res.player2Score ?? 0 : res.player1Score);
+          setMyScore(
+            isPlayer1 ? res.player1Score : res.player2Score ?? 0
+          );
+          setOpponentScore(
+            isPlayer1 ? res.player2Score ?? 0 : res.player1Score
+          );
         }
-        if (typeof res.remainingTime === "number") setRemainingTime(res.remainingTime);
+
+        if (typeof res.remainingTime === "number") {
+          setRemainingTime(res.remainingTime);
+        }
 
         if (res.question && res.question !== lastQuestionRef.current) {
           lastQuestionRef.current = res.question;
@@ -120,50 +235,70 @@ export default function DuelRoomPage() {
           setAnswerInput("");
         }
       } catch {
-  
+        // Retry on the next poll.
       }
     };
 
     poll();
     pollRef.current = setInterval(poll, 1200);
+
     return () => {
+      cancelled = true;
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [duelId, duelMeta, isPlayer1]);
 
- 
   useEffect(() => {
-    if (gameOver) return;
+    if (gameOver || !duelMeta) return;
+
     tickRef.current = setInterval(() => {
-      setRemainingTime((t) => (t === null ? t : Math.max(0, t - 1)));
+      setRemainingTime((t) =>
+        t === null ? t : Math.max(0, t - 1)
+      );
     }, 1000);
+
     return () => {
       if (tickRef.current) clearInterval(tickRef.current);
     };
-  }, [gameOver]);
+  }, [gameOver, duelMeta]);
 
   const handleSubmit = async () => {
-    if (!duelId || !answerInput || answered) return;
+    if (!duelId || !answerInput || answered || submitting) return;
+
     setSubmitting(true);
+
     try {
-      const res = await submitDuelAnswer(duelId, Number(answerInput));
+      const res = await submitDuelAnswer(
+        duelId,
+        Number(answerInput)
+      );
 
       if (res.gameOver) {
         setGameOver(true);
         setWinnerId(res.winnerId ?? null);
+
         if (typeof res.player1Score === "number") {
-          setMyScore(isPlayer1 ? res.player1Score : res.player2Score ?? 0);
-          setOpponentScore(isPlayer1 ? res.player2Score ?? 0 : res.player1Score);
+          setMyScore(
+            isPlayer1 ? res.player1Score : res.player2Score ?? 0
+          );
+          setOpponentScore(
+            isPlayer1 ? res.player2Score ?? 0 : res.player1Score
+          );
         }
+
         return;
       }
 
       setAnswered(true);
       setLastResult(res.correct ? "correct" : "wrong");
-      if (typeof res.score === "number") setMyScore(res.score);
+
+      if (typeof res.score === "number") {
+        setMyScore(res.score);
+      }
+
       setOpponentAnswered(!!res.opponentAnswered);
-    } catch {
-      // let them retry
+    } catch (error) {
+      console.error("Failed to submit duel answer:", error);
     } finally {
       setSubmitting(false);
     }
@@ -191,27 +326,42 @@ export default function DuelRoomPage() {
     );
   }
 
+  if (!duelMeta) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16">
+        <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
+      </div>
+    );
+  }
+
   if (gameOver) {
     const outcome =
       winnerId === undefined || winnerId === null
         ? "draw"
-        : winnerId === user.id
-        ? "win"
-        : "loss";
+        : String(winnerId) === String(user.id)
+          ? "win"
+          : "loss";
 
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-gray-400">Duel over</p>
+        <p className="text-sm font-medium uppercase tracking-wide text-gray-400">
+          Duel over
+        </p>
+
         <h1
           className={`mt-2 text-3xl font-bold tracking-tight ${
             outcome === "win"
               ? "text-emerald-600"
               : outcome === "loss"
-              ? "text-red-500"
-              : "text-gray-700"
+                ? "text-red-500"
+                : "text-gray-700"
           }`}
         >
-          {outcome === "win" ? "You won!" : outcome === "loss" ? "You lost" : "It's a draw"}
+          {outcome === "win"
+            ? "You won!"
+            : outcome === "loss"
+              ? "You lost"
+              : "It's a draw"}
         </h1>
 
         <div className="mx-auto mt-8 flex max-w-xs items-center justify-between">
@@ -219,10 +369,16 @@ export default function DuelRoomPage() {
             <p className="text-3xl font-bold text-gray-900">{myScore}</p>
             <p className="text-xs text-gray-500">You</p>
           </div>
+
           <span className="text-gray-300">–</span>
+
           <div>
-            <p className="text-3xl font-bold text-gray-900">{opponentScore}</p>
-            <p className="text-xs text-gray-500">{opponent?.username ?? "Opponent"}</p>
+            <p className="text-3xl font-bold text-gray-900">
+              {opponentScore}
+            </p>
+            <p className="text-xs text-gray-500">
+              {opponent?.username ?? "Opponent"}
+            </p>
           </div>
         </div>
 
@@ -243,15 +399,20 @@ export default function DuelRoomPage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
             {user.username?.[0]?.toUpperCase() || "?"}
           </span>
-          <span className="text-lg font-bold text-gray-900">{myScore}</span>
+          <span className="text-lg font-bold text-gray-900">
+            {myScore}
+          </span>
         </div>
 
         <div className="rounded-full bg-gray-900 px-4 py-1.5 text-sm font-semibold tabular-nums text-white">
-          {remainingTime ?? duelMeta?.timer ?? "–"}s
+          {remainingTime ?? duelMeta.timer ?? "–"}s
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-gray-900">{opponentScore}</span>
+          <span className="text-lg font-bold text-gray-900">
+            {opponentScore}
+          </span>
+
           <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-xs font-semibold text-gray-600">
             {opponent?.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -269,7 +430,9 @@ export default function DuelRoomPage() {
 
       <div className="mt-10 rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         {question ? (
-          <p className="text-4xl font-bold tracking-tight text-gray-900">{question}</p>
+          <p className="text-4xl font-bold tracking-tight text-gray-900">
+            {question}
+          </p>
         ) : (
           <div className="mx-auto h-10 w-40 animate-pulse rounded-lg bg-gray-100" />
         )}
@@ -280,30 +443,24 @@ export default function DuelRoomPage() {
             inputMode="numeric"
             value={answerInput}
             onChange={(e) => setAnswerInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            onKeyDown={(e) =>
+              e.key === "Enter" && handleSubmit()
+            }
             disabled={answered || submitting || !question}
             placeholder="Your answer"
             className="w-40 rounded-lg border border-gray-300 px-4 py-2.5 text-center text-lg font-semibold text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50"
           />
+
           <button
             onClick={handleSubmit}
-            disabled={answered || submitting || !question || !answerInput}
+            disabled={
+              answered || submitting || !question || !answerInput
+            }
             className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
           >
             {submitting ? "…" : "Submit"}
           </button>
         </div>
-
-        {/* {answered && (
-          <p
-            className={`mt-4 text-sm font-medium ${
-              lastResult === "correct" ? "text-emerald-600" : "text-red-500"
-            }`}
-          >
-            {lastResult === "correct" ? "Correct!" : "Not quite."}{" "}
-            {opponentAnswered ? "Next question incoming…" : "Waiting for your opponent…"}
-          </p>
-        )} */}
       </div>
     </div>
   );

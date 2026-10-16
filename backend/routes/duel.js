@@ -1,6 +1,8 @@
+
 const express = require("express");
 const router = express.Router();
 const verifyToken = require("../middlewares/auth");
+
 const {
   joinDuel,
   getDuelStatus,
@@ -10,21 +12,29 @@ const {
   challengeFriend,
   getIncomingChallenges,
   respondToChallenge,
-  cancelChallenge
+  cancelChallenge,
+  getDuelById,
+  
 } = require("../controllers/duel");
-
 
 router.post("/join", verifyToken, joinDuel);
 router.get("/status", verifyToken, getDuelStatus);
 router.delete("/queue", verifyToken, leaveDuelQueue);
 
-
 router.post("/challenge", verifyToken, challengeFriend);
 router.get("/challenges", verifyToken, getIncomingChallenges);
-router.post("/challenges/:challengeId/respond", verifyToken, respondToChallenge);
+router.post(
+  "/challenges/:challengeId/respond",
+  verifyToken,
+  respondToChallenge
+);
 router.delete("/challenges/:challengeId", verifyToken, cancelChallenge);
 
 router.get("/question/:duelId", verifyToken, getQuestion);
-router.post("/answer", verifyToken, submitAnswer);
 
+// Add this route:
+router.get("/:duelId", verifyToken, getDuelById);
+
+router.post("/answer", verifyToken, submitAnswer);
+router.get("/:duelId", verifyToken, getDuelById);
 module.exports = router;

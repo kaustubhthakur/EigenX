@@ -124,6 +124,28 @@ export function resolveAvatarUrl(
   return `${ASSET_BASE_URL}${avatar.startsWith("/") ? "" : "/"}${avatar}`;
 }
 
+
+
+export async function getDuelById(duelId: string) {
+  const response = await fetch(
+    `${DUEL_API_URL}/${encodeURIComponent(duelId)}`,
+    {
+      method: "GET",
+      credentials: "include",
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to load duel details");
+  }
+
+  return data;
+}
+
+
+
 export function registerUser(
   payload: RegisterPayload
 ): Promise<RegisterResponse> {
