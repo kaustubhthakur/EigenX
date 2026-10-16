@@ -211,14 +211,124 @@ exports.leaveDuelQueue = async (req, res) => {
   }
 };
 
+
 exports.getQuestion = async (req, res) => {
   try {
     const { duelId } = req.params;
+    const playerId = req.user.id;
 
-    if (!isValidId(duelId)) {
+    let duel = await Duel.getDuel(duelId);
+
+    if (!duel) {
+      return res.status(404).json({
+        success: false,
+        message: "Duel not found"
+      });
+    }
+
+    const isPlayer1 = String(duel.player1_id) === String(playerId);
+    const isPlayer2 = String(duel.player2_id) === String(playerId);
+
+    if (!isPlayer1 && !isPlayer2) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a participant in this duel"
+      });
+    }
+
+    if (duel.is_finished) {
+      return res.json({
+        success: true,
+        gameOver: true,
+        duel,
+        player1Score: duel.player1_score,
+        player2Score: duel.player2_score
+      });
+    }
+
+    const elapsedSeconds = duel.started_at
+      ? Math.floor((Date.now() - new Date(duel.started_at).getTime()) / 1000)
+      : 0;
+
+    const remainingTime = Math.max(0, Number(duel.timer) - elapsedSeconds);
+
+    if (remainingTime <= 0) {
+      duel = await Duel.finishDuel(duelId);
+
+      return res.json({
+        success: true,
+        gameOver: true,
+        duel,
+        player1Score: duel.player1_score,
+        player2Score: duel.player2_score,
+        remainingTime: 0
+      });
+    }
+
+    if (!duel.current_question) {
+      const a = Math.floor(Math.random() * 20) + 1;
+      const b = Math.floor(Math.random() * 20) + 1;
+      const operators = ["+", "-", "*"];
+      const operator = operators[Math.floor(Math.random() * operators.length)];
+
+      let answer;
+
+      if (operator === "+") answer = a + b;
+      else if (operator === "-") answer = a - b;
+      else answer = a * b;
+
+      const question = `${a} ${operator} ${b}`;
+
+      duel = await Duel.saveCurrentQuestion(duelId, question, answer);
+
+      if (!duel || duel.is_finished) {
+        return res.status(409).json({
+          success: false,
+          message: "Unable to load the current question"
+        });
+      }
+    }
+
+    const playerAnswered = isPlayer1
+      ? duel.player1_answered
+      : duel.player2_answered;
+
+    const opponentAnswered = isPlayer1
+      ? duel.player2_answered
+      : duel.player1_answered;
+
+    return res.json({
+      success: true,
+      question: duel.current_question,
+      player1Score: duel.player1_score,
+      player2Score: duel.player2_score,
+      player1Answered: duel.player1_answered,
+      player2Answered: duel.player2_answered,
+      answered: playerAnswered,
+      opponentAnswered,
+      waitingForOpponent: playerAnswered && !opponentAnswered,
+      remainingTime
+    });
+  } catch (err) {
+    console.error("getQuestion error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get duel question"
+    });
+  }
+};
+
+exports.submitAnswer = async (req, res) => {
+  try {
+    const { duelId } = req.params;
+    const { answer } = req.body;
+    const playerId = req.user.id;
+
+    if (answer === undefined || answer === null || String(answer).trim() === "") {
       return res.status(400).json({
         success: false,
-        message: "Invalid duelId"
+        message: "Answer is required"
       });
     }
 
@@ -231,103 +341,109 @@ exports.getQuestion = async (req, res) => {
       });
     }
 
-    if (duel.is_finished) {
-      return res.status(200).json(getGameOverResponse(duel));
-    }
+    const isPlayer1 = String(duel.player1_id) === String(playerId);
+    const isPlayer2 = String(duel.player2_id) === String(playerId);
 
-    const participant = getParticipant(duel, req.user.id);
-
-    if (!participant) {
+    if (!isPlayer1 && !isPlayer2) {
       return res.status(403).json({
         success: false,
-        message: "Not a participant in this duel"
+        message: "You are not a participant in this duel"
       });
     }
 
-    const elapsed = getElapsedSeconds(duel.started_at);
-    const timer = Number(duel.timer);
-
-    if (!Number.isFinite(timer) || timer <= 0) {
-      return res.status(500).json({
+    if (duel.is_finished) {
+      return res.status(409).json({
         success: false,
-        message: "Invalid duel timer"
+        gameOver: true,
+        message: "This duel has finished"
       });
     }
 
-    if (elapsed >= timer) {
-      const finished = await Duel.finishDuel(duel.id);
+    const elapsedSeconds = duel.started_at
+      ? Math.floor((Date.now() - new Date(duel.started_at).getTime()) / 1000)
+      : 0;
 
-      return res.status(200).json(
-        getGameOverResponse(finished)
-      );
-    }
+    if (elapsedSeconds >= Number(duel.timer)) {
+      const finishedDuel = await Duel.finishDuel(duelId);
 
-    const alreadyAnswered = participant === 1
-      ? duel.player1_answered
-      : duel.player2_answered;
-
-    if (alreadyAnswered) {
-      return res.status(200).json({
+      return res.json({
         success: true,
-        waitingForOpponent: true,
-        player1Score: duel.player1_score,
-        player2Score: duel.player2_score,
-        remainingTime: Math.max(0, timer - elapsed)
+        gameOver: true,
+        duel: finishedDuel,
+        player1Score: finishedDuel.player1_score,
+        player2Score: finishedDuel.player2_score
       });
     }
 
-    let currentQuestion = duel.current_question;
+    const result = await Duel.resolveAnswer(
+      duelId,
+      playerId,
+      answer
+    );
 
-    if (!currentQuestion) {
-      const rule = await Game.getRandomArithmetic(duel.level);
-
-      if (!rule) {
-        return res.status(500).json({
-          success: false,
-          message: "No arithmetic rule available"
-        });
-      }
-
-      const arithmetic = generateQuestion(rule);
-
-      if (
-        !arithmetic ||
-        arithmetic.question == null ||
-        arithmetic.answer == null ||
-        !Number.isFinite(Number(arithmetic.answer))
-      ) {
-        throw new Error("Invalid generated arithmetic question");
-      }
-
-      const updated = await Duel.saveCurrentQuestion(
-        duel.id,
-        arithmetic.question,
-        arithmetic.answer
-      );
-
-      currentQuestion = updated.current_question;
+    if (result.status === "not_found") {
+      return res.status(404).json({
+        success: false,
+        message: "Duel not found"
+      });
     }
 
-    if (currentQuestion == null) {
-      throw new Error("Failed to save current question");
+    if (result.status === "forbidden") {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a participant in this duel"
+      });
     }
 
-    return res.status(200).json({
+    if (result.status === "game_over") {
+      return res.status(409).json({
+        success: false,
+        gameOver: true,
+        duel: result.duel
+      });
+    }
+
+    if (result.status === "already_answered") {
+      return res.status(409).json({
+        success: false,
+        message: "You have already answered this question",
+        player1Score: result.duel.player1_score,
+        player2Score: result.duel.player2_score
+      });
+    }
+
+    if (result.status === "no_question") {
+      return res.status(409).json({
+        success: false,
+        message: "There is no active question. Please refresh."
+      });
+    }
+
+    return res.json({
       success: true,
-      question: currentQuestion,
-      player1Score: duel.player1_score,
-      player2Score: duel.player2_score,
-      remainingTime: Math.max(0, timer - elapsed)
+      correct: result.correct,
+      score: result.score,
+      player1Score: result.player1Score,
+      player2Score: result.player2Score,
+      player1Answered: result.player1Answered,
+      player2Answered: result.player2Answered,
+      opponentAnswered: isPlayer1
+        ? result.player2Answered
+        : result.player1Answered,
+      question: result.question,
+      nextQuestion: result.nextQuestion,
+      duel: result.duel
     });
   } catch (err) {
-    console.error("getQuestion error:", err);
+    console.error("submitAnswer error:", err);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to retrieve question"
+      message: "Failed to submit answer"
     });
   }
 };
+
 
 exports.submitAnswer = async (req, res) => {
   try {
