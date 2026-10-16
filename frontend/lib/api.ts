@@ -108,7 +108,7 @@ export function resolveAvatarUrl(
   return `${ASSET_BASE_URL}${avatar}`;
 }
 
-// Authentication
+
 
 export function registerUser(
   payload: RegisterPayload
@@ -141,7 +141,7 @@ export function logoutUser(): Promise<{ message: string }> {
   });
 }
 
-// Users and profile
+
 
 export function getProfile(): Promise<ProfileResponse> {
   return request<ProfileResponse>(USERS_API_URL, "/Profile");
