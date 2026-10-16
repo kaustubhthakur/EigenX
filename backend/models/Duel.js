@@ -1,7 +1,14 @@
+
 const pool = require("../db");
 
-exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
+exports.matchOpponent = async (
+  userId,
+  configurationId,
+  minLevel,
+  maxLevel
+) => {
   const client = await pool.connect();
+
   try {
     await client.query("BEGIN");
 
@@ -15,6 +22,12 @@ exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
         AND dq.user_id != $2
         AND u.is_online = TRUE
         AND FLOOR(u.xp / 100) + 1 BETWEEN $3 AND $4
+        AND NOT EXISTS (
+          SELECT 1
+          FROM duels d
+          WHERE d.is_finished = FALSE
+            AND (d.player1_id = dq.user_id OR d.player2_id = dq.user_id)
+        )
       ORDER BY dq.queued_at ASC
       LIMIT 1
       FOR UPDATE OF dq SKIP LOCKED
@@ -29,6 +42,23 @@ exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
 
     const opponent = rows[0];
 
+    const activeDuel = await client.query(
+      `
+      SELECT id
+      FROM duels
+      WHERE is_finished = FALSE
+        AND (player1_id = $1 OR player2_id = $1
+          OR player1_id = $2 OR player2_id = $2)
+      LIMIT 1
+      `,
+      [userId, opponent.user_id]
+    );
+
+    if (activeDuel.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+
     const duelResult = await client.query(
       `
       INSERT INTO duels (player1_id, player2_id, configuration_id)
@@ -41,11 +71,16 @@ exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
     const duel = duelResult.rows[0];
 
     await client.query(
-      `UPDATE duel_queue SET matched = TRUE, duel_id = $1 WHERE id = $2`,
+      `
+      UPDATE duel_queue
+      SET matched = TRUE, duel_id = $1
+      WHERE id = $2 AND matched = FALSE
+      `,
       [duel.id, opponent.queue_id]
     );
 
     await client.query("COMMIT");
+
     return duel;
   } catch (err) {
     await client.query("ROLLBACK");
@@ -56,25 +91,89 @@ exports.matchOpponent = async (userId, configurationId, minLevel, maxLevel) => {
 };
 
 exports.joinQueue = async (userId, configurationId) => {
-  const result = await pool.query(
-    `
-    INSERT INTO duel_queue (user_id, configuration_id)
-    VALUES ($1, $2)
-    RETURNING *
-    `,
-    [userId, configurationId]
-  );
+  const client = await pool.connect();
 
-  return result.rows[0];
+  try {
+    await client.query("BEGIN");
+
+    const existing = await client.query(
+      `
+      SELECT *
+      FROM duel_queue
+      WHERE user_id = $1
+        AND matched = FALSE
+      ORDER BY queued_at DESC
+      LIMIT 1
+      FOR UPDATE
+      `,
+      [userId]
+    );
+
+    if (existing.rows.length > 0) {
+      const entry = existing.rows[0];
+
+      if (String(entry.configuration_id) === String(configurationId)) {
+        await client.query("COMMIT");
+        return entry;
+      }
+
+      await client.query(
+        `DELETE FROM duel_queue WHERE user_id = $1 AND matched = FALSE`,
+        [userId]
+      );
+    }
+
+    const activeDuel = await client.query(
+      `
+      SELECT id
+      FROM duels
+      WHERE is_finished = FALSE
+        AND (player1_id = $1 OR player2_id = $1)
+      LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (activeDuel.rows.length > 0) {
+      await client.query("ROLLBACK");
+
+      const error = new Error("Already in an active duel");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const result = await client.query(
+      `
+      INSERT INTO duel_queue (user_id, configuration_id, matched)
+      VALUES ($1, $2, FALSE)
+      RETURNING *
+      `,
+      [userId, configurationId]
+    );
+
+    await client.query("COMMIT");
+
+    return result.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 exports.leaveQueue = async (userId) => {
-  await pool.query(
-    `DELETE FROM duel_queue WHERE user_id = $1 AND matched = FALSE`,
+  const result = await pool.query(
+    `
+    DELETE FROM duel_queue
+    WHERE user_id = $1 AND matched = FALSE
+    RETURNING *
+    `,
     [userId]
   );
-};
 
+  return result.rows;
+};
 
 exports.getQueueStatus = async (userId) => {
   const result = await pool.query(
@@ -88,26 +187,22 @@ exports.getQueueStatus = async (userId) => {
     [userId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.getDuel = async (duelId) => {
   const result = await pool.query(
     `
-    SELECT
-      d.*,
-      c.level,
-      c.timer
+    SELECT d.*, c.level, c.timer
     FROM duels d
-    JOIN configurations c ON d.configuration_id = c.id
+    JOIN configurations c ON c.id = d.configuration_id
     WHERE d.id = $1
     `,
     [duelId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
-
 
 exports.saveCurrentQuestion = async (duelId, question, answer) => {
   const result = await pool.query(
@@ -119,14 +214,19 @@ exports.saveCurrentQuestion = async (duelId, question, answer) => {
       player1_answered = FALSE,
       player2_answered = FALSE
     WHERE id = $1
+      AND is_finished = FALSE
+      AND current_question IS NULL
     RETURNING *
     `,
     [duelId, question, answer]
   );
 
-  return result.rows[0];
-};
+  if (result.rows[0]) {
+    return result.rows[0];
+  }
 
+  return exports.getDuel(duelId);
+};
 
 exports.clearCurrentQuestion = async (duelId) => {
   const result = await pool.query(
@@ -138,12 +238,15 @@ exports.clearCurrentQuestion = async (duelId) => {
       player1_answered = FALSE,
       player2_answered = FALSE
     WHERE id = $1
+      AND is_finished = FALSE
+      AND player1_answered = TRUE
+      AND player2_answered = TRUE
     RETURNING *
     `,
     [duelId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.markAnswered = async (duelId, playerId) => {
@@ -151,15 +254,28 @@ exports.markAnswered = async (duelId, playerId) => {
     `
     UPDATE duels
     SET
-      player1_answered = CASE WHEN player1_id = $2 THEN TRUE ELSE player1_answered END,
-      player2_answered = CASE WHEN player2_id = $2 THEN TRUE ELSE player2_answered END
+      player1_answered = CASE
+        WHEN player1_id = $2 THEN TRUE
+        ELSE player1_answered
+      END,
+      player2_answered = CASE
+        WHEN player2_id = $2 THEN TRUE
+        ELSE player2_answered
+      END
     WHERE id = $1
+      AND is_finished = FALSE
+      AND current_question IS NOT NULL
+      AND (
+        (player1_id = $2 AND player1_answered = FALSE)
+        OR
+        (player2_id = $2 AND player2_answered = FALSE)
+      )
     RETURNING *
     `,
     [duelId, playerId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.updateScore = async (duelId, playerId, score) => {
@@ -167,15 +283,25 @@ exports.updateScore = async (duelId, playerId, score) => {
     `
     UPDATE duels
     SET
-      player1_score = CASE WHEN player1_id = $2 THEN $3 ELSE player1_score END,
-      player2_score = CASE WHEN player2_id = $2 THEN $3 ELSE player2_score END
+      player1_score = CASE
+        WHEN player1_id = $2 THEN $3
+        ELSE player1_score
+      END,
+      player2_score = CASE
+        WHEN player2_id = $2 THEN $3
+        ELSE player2_score
+      END
     WHERE id = $1
+      AND is_finished = FALSE
+      AND (
+        player1_id = $2 OR player2_id = $2
+      )
     RETURNING *
     `,
     [duelId, playerId, score]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.finishDuel = async (duelId) => {
@@ -191,12 +317,17 @@ exports.finishDuel = async (duelId) => {
         ELSE NULL
       END
     WHERE id = $1
+      AND is_finished = FALSE
     RETURNING *
     `,
     [duelId]
   );
 
-  return result.rows[0];
+  if (result.rows[0]) {
+    return result.rows[0];
+  }
+
+  return exports.getDuel(duelId);
 };
 
 
@@ -205,11 +336,8 @@ exports.areFriends = async (userId1, userId2) => {
     `
     SELECT 1
     FROM friends
-    WHERE status = 'accepted'
-      AND (
-        (requester_id = $1 AND receiver_id = $2)
-        OR (requester_id = $2 AND receiver_id = $1)
-      )
+    WHERE user_id = $1
+      AND friend_id = $2
     LIMIT 1
     `,
     [userId1, userId2]
@@ -219,7 +347,11 @@ exports.areFriends = async (userId1, userId2) => {
 };
 
 
-exports.createDuel = async (player1Id, player2Id, configurationId) => {
+exports.createDuel = async (
+  player1Id,
+  player2Id,
+  configurationId
+) => {
   const result = await pool.query(
     `
     INSERT INTO duels (player1_id, player2_id, configuration_id)
@@ -232,33 +364,90 @@ exports.createDuel = async (player1Id, player2Id, configurationId) => {
   return result.rows[0];
 };
 
-exports.createChallenge = async (challengerId, challengedId, configurationId) => {
-  const result = await pool.query(
-    `
-    INSERT INTO duel_challenges (challenger_id, challenged_id, configuration_id)
-    VALUES ($1, $2, $3)
-    RETURNING *
-    `,
-    [challengerId, challengedId, configurationId]
-  );
+exports.createChallenge = async (
+  challengerId,
+  challengedId,
+  configurationId
+) => {
+  const client = await pool.connect();
 
-  return result.rows[0];
+  try {
+    await client.query("BEGIN");
+
+    const configuration = await client.query(
+      `SELECT id FROM configurations WHERE id = $1`,
+      [configurationId]
+    );
+
+    if (configuration.rows.length === 0) {
+      const error = new Error("Configuration not found");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const existing = await client.query(
+      `
+      SELECT id
+      FROM duel_challenges
+      WHERE status = 'pending'
+        AND (
+          (challenger_id = $1 AND challenged_id = $2)
+          OR
+          (challenger_id = $2 AND challenged_id = $1)
+        )
+      LIMIT 1
+      `,
+      [challengerId, challengedId]
+    );
+
+    if (existing.rows.length > 0) {
+      const error = new Error("A pending challenge already exists");
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const result = await client.query(
+      `
+      INSERT INTO duel_challenges (
+        challenger_id,
+        challenged_id,
+        configuration_id,
+        status
+      )
+      VALUES ($1, $2, $3, 'pending')
+      RETURNING *
+      `,
+      [challengerId, challengedId, configurationId]
+    );
+
+    await client.query("COMMIT");
+
+    return result.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
-exports.getPendingChallengeBetween = async (challengerId, challengedId) => {
+exports.getPendingChallengeBetween = async (userId1, userId2) => {
   const result = await pool.query(
     `
     SELECT *
     FROM duel_challenges
-    WHERE challenger_id = $1
-      AND challenged_id = $2
-      AND status = 'pending'
+    WHERE status = 'pending'
+      AND (
+        (challenger_id = $1 AND challenged_id = $2)
+        OR
+        (challenger_id = $2 AND challenged_id = $1)
+      )
     LIMIT 1
     `,
-    [challengerId, challengedId]
+    [userId1, userId2]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.getChallenge = async (challengeId) => {
@@ -267,7 +456,7 @@ exports.getChallenge = async (challengeId) => {
     [challengeId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.getIncomingChallenges = async (userId) => {
@@ -290,7 +479,15 @@ exports.getIncomingChallenges = async (userId) => {
   return result.rows;
 };
 
-exports.respondToChallenge = async (challengeId, status, duelId = null) => {
+exports.respondToChallenge = async (
+  challengeId,
+  status,
+  duelId = null
+) => {
+  if (!["accepted", "declined"].includes(status)) {
+    throw new Error("Invalid challenge response status");
+  }
+
   const result = await pool.query(
     `
     UPDATE duel_challenges
@@ -299,19 +496,22 @@ exports.respondToChallenge = async (challengeId, status, duelId = null) => {
       duel_id = $3,
       responded_at = NOW()
     WHERE id = $1
+      AND status = 'pending'
     RETURNING *
     `,
     [challengeId, status, duelId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };
 
 exports.cancelChallenge = async (challengeId, challengerId) => {
   const result = await pool.query(
     `
     UPDATE duel_challenges
-    SET status = 'cancelled', responded_at = NOW()
+    SET
+      status = 'cancelled',
+      responded_at = NOW()
     WHERE id = $1
       AND challenger_id = $2
       AND status = 'pending'
@@ -320,5 +520,5 @@ exports.cancelChallenge = async (challengeId, challengerId) => {
     [challengeId, challengerId]
   );
 
-  return result.rows[0];
+  return result.rows[0] || null;
 };

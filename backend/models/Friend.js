@@ -92,6 +92,7 @@ exports.acceptFriendRequest = async (
     client.release();
   }
 };
+
 exports.getFriends = async (
   userId
 ) => {

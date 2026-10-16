@@ -1,10 +1,7 @@
+
 const pool = require("../db");
 
-exports.createUser = async ({
-  username,
-  email,
-  password
-}) => {
+exports.createUser = async ({ username, email, password }) => {
   const result = await pool.query(
     `
     INSERT INTO users (
@@ -16,15 +13,7 @@ exports.createUser = async ({
       top_score,
       xp
     )
-    VALUES (
-      $1,
-      $2,
-      $3,
-      NULL,
-      FALSE,
-      0,
-      0
-    )
+    VALUES ($1, $2, $3, NULL, FALSE, 0, 0)
     RETURNING
       id,
       username,
@@ -67,11 +56,7 @@ exports.getUserWithLevel = async (id) => {
 
 exports.findUserByEmail = async (email) => {
   const result = await pool.query(
-    `
-    SELECT *
-    FROM users
-    WHERE email = $1
-    `,
+    `SELECT * FROM users WHERE email = $1`,
     [email]
   );
 
@@ -80,11 +65,7 @@ exports.findUserByEmail = async (email) => {
 
 exports.findUserByUsername = async (username) => {
   const result = await pool.query(
-    `
-    SELECT *
-    FROM users
-    WHERE username = $1
-    `,
+    `SELECT * FROM users WHERE username = $1`,
     [username]
   );
 
@@ -93,11 +74,7 @@ exports.findUserByUsername = async (username) => {
 
 exports.findUserById = async (id) => {
   const result = await pool.query(
-    `
-    SELECT *
-    FROM users
-    WHERE id = $1
-    `,
+    `SELECT * FROM users WHERE id = $1`,
     [id]
   );
 
@@ -147,13 +124,7 @@ exports.getAllUsers = async () => {
   return result.rows;
 };
 
-exports.updateUser = async (
-  id,
-  {
-    username,
-    avatar
-  }
-) => {
+exports.updateUser = async (id, { username, avatar }) => {
   const result = await pool.query(
     `
     UPDATE users
@@ -178,30 +149,30 @@ exports.updateUser = async (
   return result.rows[0];
 };
 
-exports.updateOnlineStatus = async (
-  userId,
-  isOnline
-) => {
+exports.updateOnlineStatus = async (userId, isOnline) => {
   const result = await pool.query(
     `
     UPDATE users
     SET
       is_online = $1,
-      last_seen = NOW()
+      last_seen = CASE
+        WHEN $1 = FALSE THEN NOW()
+        ELSE last_seen
+      END
     WHERE id = $2
-    RETURNING *
+    RETURNING
+      id,
+      username,
+      is_online,
+      last_seen
     `,
-    [isOnline, userId]
+    [Boolean(isOnline), userId]
   );
 
   return result.rows[0];
 };
 
-exports.updateScoreAndXp = async (
-  userId,
-  score,
-  xp
-) => {
+exports.updateScoreAndXp = async (userId, score, xp) => {
   const result = await pool.query(
     `
     UPDATE users
@@ -226,18 +197,10 @@ exports.updateScoreAndXp = async (
   return result.rows[0];
 };
 
-exports.saveLoginOtp = async (
-  userId,
-  otp,
-  expiresAt
-) => {
+exports.saveLoginOtp = async (userId, otp, expiresAt) => {
   await pool.query(
     `
-    INSERT INTO login_otps (
-      user_id,
-      otp,
-      expires_at
-    )
+    INSERT INTO login_otps (user_id, otp, expires_at)
     VALUES ($1, $2, $3)
     `,
     [userId, otp, expiresAt]
@@ -261,10 +224,7 @@ exports.getLatestOtp = async (userId) => {
 
 exports.deleteOtp = async (userId) => {
   await pool.query(
-    `
-    DELETE FROM login_otps
-    WHERE user_id = $1
-    `,
+    `DELETE FROM login_otps WHERE user_id = $1`,
     [userId]
   );
 };

@@ -1,3 +1,4 @@
+
 import type {
   ApiErrorBody,
   LoginPayload,
@@ -28,26 +29,18 @@ import type {
   IncomingChallengesResponse,
 } from "../types/duel";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/auth";
 
-const USERS_API_URL =
-  process.env.NEXT_PUBLIC_USERS_API_URL || "http://localhost:8081/users";
+const API_HOST =
+  process.env.NEXT_PUBLIC_API_HOST || "http://localhost:8081";
 
-const FRIENDS_API_URL =
-  process.env.NEXT_PUBLIC_FRIENDS_API_URL || "http://localhost:8081/friends";
+const API_URL = `${API_HOST}/auth`;
+const USERS_API_URL = `${API_HOST}/users`;
+const FRIENDS_API_URL = `${API_HOST}/friends`;
+const CONFIG_API_URL = `${API_HOST}/configuration`;
+const GAME_API_URL = `${API_HOST}/game`;
+const DASHBOARD_API_URL = `${API_HOST}/dashboard`;
+const DUEL_API_URL = `${API_HOST}/duel`;
 
-const CONFIG_API_URL =
-  process.env.NEXT_PUBLIC_CONFIG_API_URL || "http://localhost:8081/configuration";
-
-const GAME_API_URL =
-  process.env.NEXT_PUBLIC_GAME_API_URL || "http://localhost:8081/game";
-
-const DASHBOARD_API_URL =
-  process.env.NEXT_PUBLIC_DASHBOARD_API_URL || "http://localhost:8081/dashboard";
-
-const DUEL_API_URL =
-  process.env.NEXT_PUBLIC_DUEL_API_URL || "http://localhost:8081/duel";
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -55,38 +48,57 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+interface ApiMessage {
+  success?: boolean;
+  message?: string;
+  error?: string;
+}
+
 async function request<T>(
   base: string,
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const res = await fetch(`${base}${path}`, {
-    method: options.method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    credentials: "include",
-    body:
-      options.body !== undefined
-        ? JSON.stringify(options.body)
-        : undefined,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${base}${path}`, {
+      method: options.method || "GET",
+      headers: {
+        ...(options.body !== undefined
+          ? { "Content-Type": "application/json" }
+          : {}),
+        ...(options.headers || {}),
+      },
+      credentials: "include",
+      body:
+        options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
+    });
+  } catch {
+    throw new Error(
+      "Cannot connect to the server. Check your backend URL and connection."
+    );
+  }
 
   let data: unknown = null;
 
   try {
-    data = await res.json();
+    data = await response.json();
   } catch {
-    // Response has no JSON body.
+    data = null;
   }
 
-  if (!res.ok) {
-    const body = data as (ApiErrorBody & { message?: string }) | null;
+  if (!response.ok) {
+    const body = data as
+      | (ApiErrorBody & ApiMessage)
+      | null;
+
     const message =
-      body?.error ||
       body?.message ||
-      "Something went wrong. Please try again.";
+      body?.error ||
+      `Request failed with status ${response.status}`;
 
     throw new Error(message);
   }
@@ -94,21 +106,23 @@ async function request<T>(
   return data as T;
 }
 
-export const ASSET_BASE_URL = USERS_API_URL.replace(/\/users$/, "");
+function encodeId(id: string | number): string {
+  return encodeURIComponent(String(id));
+}
+
+export const ASSET_BASE_URL = USERS_API_URL.replace(/\/users\/?$/, "");
 
 export function resolveAvatarUrl(
   avatar?: string | null
 ): string | undefined {
   if (!avatar) return undefined;
 
-  if (avatar.startsWith("http://") || avatar.startsWith("https://")) {
+  if (/^https?:\/\//i.test(avatar)) {
     return avatar;
   }
 
-  return `${ASSET_BASE_URL}${avatar}`;
+  return `${ASSET_BASE_URL}${avatar.startsWith("/") ? "" : "/"}${avatar}`;
 }
-
-
 
 export function registerUser(
   payload: RegisterPayload
@@ -119,7 +133,9 @@ export function registerUser(
   });
 }
 
-export function loginUser(payload: LoginPayload): Promise<LoginResponse> {
+export function loginUser(
+  payload: LoginPayload
+): Promise<LoginResponse> {
   return request<LoginResponse>(API_URL, "/login", {
     method: "POST",
     body: payload,
@@ -141,14 +157,17 @@ export function logoutUser(): Promise<{ message: string }> {
   });
 }
 
-
-
 export function getProfile(): Promise<ProfileResponse> {
   return request<ProfileResponse>(USERS_API_URL, "/Profile");
 }
 
-export function getUserById(id: string): Promise<ProfileResponse> {
-  return request<ProfileResponse>(USERS_API_URL, `/${id}`);
+export function getUserById(
+  id: string
+): Promise<ProfileResponse> {
+  return request<ProfileResponse>(
+    USERS_API_URL,
+    `/${encodeId(id)}`
+  );
 }
 
 export function getAllUsers(): Promise<{
@@ -178,29 +197,34 @@ export function updateScore(
   });
 }
 
-export async function uploadAvatar(file: File): Promise<ProfileResponse> {
-  const base64Image = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
+export async function uploadAvatar(
+  file: File
+): Promise<ProfileResponse> {
+  const base64Image = await new Promise<string>(
+    (resolve, reject) => {
+      const reader = new FileReader();
 
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Failed to convert image"));
-      }
-    };
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert image."));
+        }
+      };
 
-    reader.onerror = () => reject(new Error("Failed to read image"));
-    reader.readAsDataURL(file);
-  });
+      reader.onerror = () => {
+        reject(new Error("Failed to read image."));
+      };
+
+      reader.readAsDataURL(file);
+    }
+  );
 
   return request<ProfileResponse>(USERS_API_URL, "/avatar", {
     method: "POST",
     body: { image: base64Image },
   });
 }
-
-// Friends
 
 export interface SendFriendRequestResponse {
   success: boolean;
@@ -220,16 +244,20 @@ export interface SentRequestsResponse {
 export function sendFriendRequest(
   receiverId: string
 ): Promise<SendFriendRequestResponse> {
-  return request<SendFriendRequestResponse>(FRIENDS_API_URL, "/request", {
-    method: "POST",
-    body: { receiverId },
-  });
+  return request<SendFriendRequestResponse>(
+    FRIENDS_API_URL,
+    "/request",
+    {
+      method: "POST",
+      body: { receiverId },
+    }
+  );
 }
 
 export function acceptFriendRequest(
   requestId: string
 ): Promise<{ success: boolean; message: string }> {
-  return request(FRIENDS_API_URL, `/accept/${requestId}`, {
+  return request(FRIENDS_API_URL, `/accept/${encodeId(requestId)}`, {
     method: "PUT",
   });
 }
@@ -239,7 +267,10 @@ export function getFriends(): Promise<FriendsResponse> {
 }
 
 export function getPendingRequests(): Promise<PendingRequestsResponse> {
-  return request<PendingRequestsResponse>(FRIENDS_API_URL, "/requests");
+  return request<PendingRequestsResponse>(
+    FRIENDS_API_URL,
+    "/requests"
+  );
 }
 
 export function getSentRequests(): Promise<SentRequestsResponse> {
@@ -249,12 +280,10 @@ export function getSentRequests(): Promise<SentRequestsResponse> {
 export function removeFriend(
   friendId: string
 ): Promise<{ success: boolean; message: string }> {
-  return request(FRIENDS_API_URL, `/${friendId}`, {
+  return request(FRIENDS_API_URL, `/${encodeId(friendId)}`, {
     method: "DELETE",
   });
 }
-
-// Game configuration
 
 export interface GameConfiguration {
   id: string;
@@ -280,22 +309,19 @@ export interface StartGameResponse {
 }
 
 export async function getConfigurations(): Promise<GameConfiguration[]> {
-  try {
-    const res = await request<{
-      success: boolean;
-      configurations: GameConfiguration[];
-    }>(CONFIG_API_URL, "/");
+  const response = await request<{
+    success: boolean;
+    configurations: GameConfiguration[];
+  }>(CONFIG_API_URL, "/");
 
-    return res.configurations;
-  } catch {
-    return [1, 2, 3].flatMap((level) =>
-      [30, 60, 90].map((timer) => ({
-        id: `fallback-${level}-${timer}`,
-        level,
-        timer,
-      }))
-    );
+  if (
+    !response.success ||
+    !Array.isArray(response.configurations)
+  ) {
+    throw new Error("Failed to load game configurations.");
   }
+
+  return response.configurations;
 }
 
 export function startGame(payload: {
@@ -311,10 +337,14 @@ export function startGame(payload: {
 export function startCustomGame(
   settings: CustomSettings
 ): Promise<StartGameResponse> {
-  return request<StartGameResponse>(CONFIG_API_URL, "/start-custom", {
-    method: "POST",
-    body: settings,
-  });
+  return request<StartGameResponse>(
+    CONFIG_API_URL,
+    "/start-custom",
+    {
+      method: "POST",
+      body: settings,
+    }
+  );
 }
 
 export interface QuestionResponse {
@@ -333,8 +363,13 @@ export interface AnswerResponse {
   nextQuestion?: boolean;
 }
 
-export function getQuestion(sessionId: string): Promise<QuestionResponse> {
-  return request<QuestionResponse>(GAME_API_URL, `/question/${sessionId}`);
+export function getQuestion(
+  sessionId: string
+): Promise<QuestionResponse> {
+  return request<QuestionResponse>(
+    GAME_API_URL,
+    `/question/${encodeId(sessionId)}`
+  );
 }
 
 export function submitAnswer(
@@ -346,8 +381,6 @@ export function submitAnswer(
     body: { sessionId, answer },
   });
 }
-
-// Leaderboard
 
 export interface LeaderboardEntry {
   rank: number;
@@ -369,19 +402,34 @@ export interface LeaderboardResponse {
 }
 
 export function getLeaderboard(): Promise<LeaderboardResponse> {
-  return request<LeaderboardResponse>(DASHBOARD_API_URL, "/leaderboard");
+  return request<LeaderboardResponse>(
+    DASHBOARD_API_URL,
+    "/leaderboard"
+  );
 }
 
-// Duels
 
 export function joinDuel(
-  configurationId: string
+  configurationId: string | number
 ): Promise<JoinDuelResponse> {
+  const normalizedConfigurationId = String(
+    configurationId ?? ""
+  ).trim();
+
+  if (!normalizedConfigurationId) {
+    return Promise.reject(
+      new Error("Please select a game configuration.")
+    );
+  }
+
   return request<JoinDuelResponse>(DUEL_API_URL, "/join", {
     method: "POST",
-    body: { configurationId },
+    body: {
+      configurationId: normalizedConfigurationId,
+    },
   });
 }
+
 
 export function getDuelStatus(): Promise<DuelStatusResponse> {
   return request<DuelStatusResponse>(DUEL_API_URL, "/status");
@@ -396,18 +444,42 @@ export function leaveDuelQueue(): Promise<{
   });
 }
 
+
 export function challengeFriend(
-  friendId: string,
-  configurationId: string
+  friendId: string | number,
+  configurationId: string | number
 ): Promise<ChallengeResponse> {
-  return request<ChallengeResponse>(DUEL_API_URL, "/challenge", {
-    method: "POST",
-    body: { friendId, configurationId },
-  });
+  const normalizedFriendId = String(friendId ?? "").trim();
+  const normalizedConfigurationId = String(configurationId ?? "").trim();
+
+  if (!normalizedFriendId) {
+    return Promise.reject(new Error("Please select a friend."));
+  }
+
+  if (!normalizedConfigurationId) {
+    return Promise.reject(
+      new Error("Please select a valid game configuration.")
+    );
+  }
+
+  return request<ChallengeResponse>(
+    DUEL_API_URL,
+    "/challenge",
+    {
+      method: "POST",
+      body: {
+        friendId: normalizedFriendId,
+        configurationId: normalizedConfigurationId,
+      },
+    }
+  );
 }
 
 export function getIncomingChallenges(): Promise<IncomingChallengesResponse> {
-  return request<IncomingChallengesResponse>(DUEL_API_URL, "/challenges");
+  return request<IncomingChallengesResponse>(
+    DUEL_API_URL,
+    "/challenges"
+  );
 }
 
 export function respondToChallenge(
@@ -416,7 +488,7 @@ export function respondToChallenge(
 ): Promise<ChallengeResponse> {
   return request<ChallengeResponse>(
     DUEL_API_URL,
-    `/challenges/${challengeId}/respond`,
+    `/challenges/${encodeId(challengeId)}/respond`,
     {
       method: "POST",
       body: { accept },
@@ -427,23 +499,41 @@ export function respondToChallenge(
 export function cancelChallenge(
   challengeId: string
 ): Promise<ChallengeResponse> {
-  return request<ChallengeResponse>(DUEL_API_URL, `/challenges/${challengeId}`, {
-    method: "DELETE",
-  });
+  return request<ChallengeResponse>(
+    DUEL_API_URL,
+    `/challenges/${encodeId(challengeId)}`,
+    {
+      method: "DELETE",
+    }
+  );
 }
 
 export function getDuelQuestion(
   duelId: string
 ): Promise<DuelQuestionResponse> {
-  return request<DuelQuestionResponse>(DUEL_API_URL, `/question/${duelId}`);
+  return request<DuelQuestionResponse>(
+    DUEL_API_URL,
+    `/question/${encodeId(duelId)}`
+  );
 }
 
 export function submitDuelAnswer(
   duelId: string,
   answer: number
 ): Promise<DuelAnswerResponse> {
+  if (!duelId.trim()) {
+    return Promise.reject(new Error("Invalid duel ID."));
+  }
+
+  if (!Number.isFinite(answer)) {
+    return Promise.reject(new Error("Enter a valid numeric answer."));
+  }
+
   return request<DuelAnswerResponse>(DUEL_API_URL, "/answer", {
     method: "POST",
-    body: { duelId, answer },
+    body: {
+      duelId,
+      answer,
+    },
   });
 }
