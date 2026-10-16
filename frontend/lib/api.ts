@@ -29,7 +29,6 @@ import type {
   IncomingChallengesResponse,
 } from "../types/duel";
 
-
 const API_HOST =
   process.env.NEXT_PUBLIC_API_HOST || "http://localhost:8081";
 
@@ -40,7 +39,6 @@ const CONFIG_API_URL = `${API_HOST}/configuration`;
 const GAME_API_URL = `${API_HOST}/game`;
 const DASHBOARD_API_URL = `${API_HOST}/dashboard`;
 const DUEL_API_URL = `${API_HOST}/duel`;
-
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -91,9 +89,7 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    const body = data as
-      | (ApiErrorBody & ApiMessage)
-      | null;
+    const body = data as (ApiErrorBody & ApiMessage) | null;
 
     const message =
       body?.message ||
@@ -124,8 +120,6 @@ export function resolveAvatarUrl(
   return `${ASSET_BASE_URL}${avatar.startsWith("/") ? "" : "/"}${avatar}`;
 }
 
-
-
 export async function getDuelById(duelId: string) {
   const response = await fetch(
     `${DUEL_API_URL}/${encodeURIComponent(duelId)}`,
@@ -143,8 +137,6 @@ export async function getDuelById(duelId: string) {
 
   return data;
 }
-
-
 
 export function registerUser(
   payload: RegisterPayload
@@ -183,13 +175,8 @@ export function getProfile(): Promise<ProfileResponse> {
   return request<ProfileResponse>(USERS_API_URL, "/Profile");
 }
 
-export function getUserById(
-  id: string
-): Promise<ProfileResponse> {
-  return request<ProfileResponse>(
-    USERS_API_URL,
-    `/${encodeId(id)}`
-  );
+export function getUserById(id: string): Promise<ProfileResponse> {
+  return request<ProfileResponse>(USERS_API_URL, `/${encodeId(id)}`);
 }
 
 export function getAllUsers(): Promise<{
@@ -222,25 +209,23 @@ export function updateScore(
 export async function uploadAvatar(
   file: File
 ): Promise<ProfileResponse> {
-  const base64Image = await new Promise<string>(
-    (resolve, reject) => {
-      const reader = new FileReader();
+  const base64Image = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
 
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-        } else {
-          reject(new Error("Failed to convert image."));
-        }
-      };
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to convert image."));
+      }
+    };
 
-      reader.onerror = () => {
-        reject(new Error("Failed to read image."));
-      };
+    reader.onerror = () => {
+      reject(new Error("Failed to read image."));
+    };
 
-      reader.readAsDataURL(file);
-    }
-  );
+    reader.readAsDataURL(file);
+  });
 
   return request<ProfileResponse>(USERS_API_URL, "/avatar", {
     method: "POST",
@@ -289,10 +274,7 @@ export function getFriends(): Promise<FriendsResponse> {
 }
 
 export function getPendingRequests(): Promise<PendingRequestsResponse> {
-  return request<PendingRequestsResponse>(
-    FRIENDS_API_URL,
-    "/requests"
-  );
+  return request<PendingRequestsResponse>(FRIENDS_API_URL, "/requests");
 }
 
 export function getSentRequests(): Promise<SentRequestsResponse> {
@@ -336,10 +318,7 @@ export async function getConfigurations(): Promise<GameConfiguration[]> {
     configurations: GameConfiguration[];
   }>(CONFIG_API_URL, "/");
 
-  if (
-    !response.success ||
-    !Array.isArray(response.configurations)
-  ) {
+  if (!response.success || !Array.isArray(response.configurations)) {
     throw new Error("Failed to load game configurations.");
   }
 
@@ -430,7 +409,6 @@ export function getLeaderboard(): Promise<LeaderboardResponse> {
   );
 }
 
-
 export function joinDuel(
   configurationId: string | number
 ): Promise<JoinDuelResponse> {
@@ -452,7 +430,6 @@ export function joinDuel(
   });
 }
 
-
 export function getDuelStatus(): Promise<DuelStatusResponse> {
   return request<DuelStatusResponse>(DUEL_API_URL, "/status");
 }
@@ -466,13 +443,14 @@ export function leaveDuelQueue(): Promise<{
   });
 }
 
-
 export function challengeFriend(
   friendId: string | number,
   configurationId: string | number
 ): Promise<ChallengeResponse> {
   const normalizedFriendId = String(friendId ?? "").trim();
-  const normalizedConfigurationId = String(configurationId ?? "").trim();
+  const normalizedConfigurationId = String(
+    configurationId ?? ""
+  ).trim();
 
   if (!normalizedFriendId) {
     return Promise.reject(new Error("Please select a friend."));
@@ -484,17 +462,13 @@ export function challengeFriend(
     );
   }
 
-  return request<ChallengeResponse>(
-    DUEL_API_URL,
-    "/challenge",
-    {
-      method: "POST",
-      body: {
-        friendId: normalizedFriendId,
-        configurationId: normalizedConfigurationId,
-      },
-    }
-  );
+  return request<ChallengeResponse>(DUEL_API_URL, "/challenge", {
+    method: "POST",
+    body: {
+      friendId: normalizedFriendId,
+      configurationId: normalizedConfigurationId,
+    },
+  });
 }
 
 export function getIncomingChallenges(): Promise<IncomingChallengesResponse> {
@@ -523,7 +497,7 @@ export function cancelChallenge(
 ): Promise<ChallengeResponse> {
   return request<ChallengeResponse>(
     DUEL_API_URL,
-    `/challenges/${encodeId(challengeId)}`,
+    `/${encodeId(challengeId)}`,
     {
       method: "DELETE",
     }
@@ -541,21 +515,34 @@ export function getDuelQuestion(
 
 export function submitDuelAnswer(
   duelId: string,
-  answer: number
+  answer: number | string
 ): Promise<DuelAnswerResponse> {
-  if (!duelId.trim()) {
+  const normalizedDuelId = String(duelId ?? "").trim();
+  const answerText = String(answer ?? "").trim();
+  const numericAnswer = Number(answerText);
+
+  if (!normalizedDuelId) {
     return Promise.reject(new Error("Invalid duel ID."));
   }
 
-  if (!Number.isFinite(answer)) {
-    return Promise.reject(new Error("Enter a valid numeric answer."));
+  if (
+    answerText === "" ||
+    !Number.isFinite(numericAnswer)
+  ) {
+    return Promise.reject(
+      new Error("Enter a valid numeric answer.")
+    );
   }
 
-  return request<DuelAnswerResponse>(DUEL_API_URL, "/answer", {
-    method: "POST",
-    body: {
-      duelId,
-      answer,
-    },
-  });
+  return request<DuelAnswerResponse>(
+    DUEL_API_URL,
+    "/answer",
+    {
+      method: "POST",
+      body: {
+        duelId: normalizedDuelId,
+        answer: numericAnswer,
+      },
+    }
+  );
 }
