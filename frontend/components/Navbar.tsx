@@ -13,6 +13,9 @@ const NAV_LINKS = [
   { href: "/duel", label: "Duel", auth: true },
 ];
 
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
 export default function Navbar() {
   const { user, loading, logoutLocal } = useAuth();
   const router = useRouter();
@@ -22,7 +25,9 @@ export default function Navbar() {
 
   const links = NAV_LINKS.filter((l) => !l.auth || user);
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+    href === "/"
+      ? pathname === "/"
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -39,24 +44,39 @@ export default function Navbar() {
   };
 
   const linkClass = (active: boolean) =>
-    `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+    `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${focusRing} ${
       active
-        ? "bg-slate-100 text-slate-900"
-        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+        ? "bg-white/10 text-white ring-1 ring-inset ring-white/10"
+        : "text-slate-400 hover:bg-white/5 hover:text-white"
     }`;
 
-  const ghostButton =
-    "rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-60";
+  const ghostButton = `rounded-lg bg-white/5 px-3.5 py-1.5 text-sm font-medium text-slate-200 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/10 disabled:opacity-60 ${focusRing}`;
+
+  const primaryButton = `rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-4 py-1.5 text-sm font-semibold text-white shadow-[0_6px_24px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`;
+
+  const avatar = (size: string) => (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 font-semibold text-white ring-2 ring-white/10 ${size}`}
+    >
+      {user?.username?.[0]?.toUpperCase() || "?"}
+    </span>
+  );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070815]/70 backdrop-blur-xl">
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-2.5" onClick={() => setMenuOpen(false)}>
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-lg font-semibold leading-none text-white shadow-sm">
+        <Link
+          href="/"
+          className={`flex items-center gap-2.5 rounded-lg ${focusRing}`}
+          onClick={() => setMenuOpen(false)}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-semibold leading-none text-white shadow-[0_0_18px_rgba(99,102,241,0.55)]">
             Λ
           </span>
-          <span className="text-[15px] font-semibold tracking-tight text-slate-900">EigenX</span>
+          <span className="text-[15px] font-semibold tracking-tight text-white">
+            EigenX
+          </span>
         </Link>
 
         {/* Desktop links */}
@@ -76,21 +96,23 @@ export default function Navbar() {
         {/* Desktop account area */}
         <div className="hidden items-center gap-2 md:flex">
           {loading ? (
-            <div className="h-8 w-32 animate-pulse rounded-lg bg-slate-100" />
+            <div className="h-8 w-32 animate-pulse rounded-lg bg-white/10" />
           ) : user ? (
             <>
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2.5 transition-colors hover:bg-slate-50"
+                className={`flex items-center gap-2 rounded-lg py-1 pl-1 pr-2.5 transition-colors hover:bg-white/5 ${focusRing}`}
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
-                  {user.username?.[0]?.toUpperCase() || "?"}
-                </span>
-                <span className="max-w-[140px] truncate text-sm font-medium text-slate-700">
+                {avatar("h-7 w-7 text-xs")}
+                <span className="max-w-[140px] truncate text-sm font-medium text-slate-200">
                   {user.username}
                 </span>
               </Link>
-              <button onClick={handleLogout} disabled={loggingOut} className={ghostButton}>
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className={ghostButton}
+              >
                 {loggingOut ? "Logging out…" : "Log out"}
               </button>
             </>
@@ -98,14 +120,11 @@ export default function Navbar() {
             <>
               <Link
                 href="/login"
-                className="rounded-lg px-3.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                className={`rounded-lg px-3.5 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white ${focusRing}`}
               >
                 Log in
               </Link>
-              <Link
-                href="/register"
-                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-              >
+              <Link href="/register" className={primaryButton}>
                 Sign up
               </Link>
             </>
@@ -118,9 +137,18 @@ export default function Navbar() {
           onClick={() => setMenuOpen((o) => !o)}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 md:hidden"
+          className={`flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/10 md:hidden ${focusRing}`}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             {menuOpen ? (
               <path d="M6 6l12 12M18 6L6 18" />
             ) : (
@@ -132,7 +160,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="border-t border-slate-200 bg-white px-4 pb-4 pt-3 md:hidden">
+        <div className="border-t border-white/10 bg-[#0b0c1f]/95 px-4 pb-4 pt-3 backdrop-blur-xl md:hidden">
           <div className="flex flex-col gap-1">
             {links.map((link) => (
               <Link
@@ -147,16 +175,20 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="mt-3 border-t border-slate-100 pt-3">
+          <div className="mt-3 border-t border-white/10 pt-3">
             {loading ? null : user ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
-                    {user.username?.[0]?.toUpperCase() || "?"}
+                  {avatar("h-7 w-7 text-xs")}
+                  <span className="truncate text-sm font-medium text-slate-200">
+                    {user.username}
                   </span>
-                  <span className="truncate text-sm font-medium text-slate-700">{user.username}</span>
                 </div>
-                <button onClick={handleLogout} disabled={loggingOut} className={ghostButton}>
+                <button
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className={ghostButton}
+                >
                   {loggingOut ? "Logging out…" : "Log out"}
                 </button>
               </div>
@@ -172,7 +204,7 @@ export default function Navbar() {
                 <Link
                   href="/register"
                   onClick={() => setMenuOpen(false)}
-                  className="flex-1 rounded-lg bg-indigo-600 px-4 py-1.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                  className={`${primaryButton} flex-1 text-center`}
                 >
                   Sign up
                 </Link>
