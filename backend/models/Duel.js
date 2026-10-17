@@ -3,6 +3,30 @@ const pool = require("../db");
 const sameId = (a, b) =>
   a != null && b != null && String(a) === String(b);
 
+// Closes duels whose timer has run out but that nobody finished
+// (e.g. both players left). Without this they stay "active" forever and
+// block joining the queue or starting new duels.
+exports.finishExpiredDuels = async (db = pool) => {
+  await db.query(
+    `
+    UPDATE duels d
+    SET
+      ended_at = NOW(),
+      is_finished = TRUE,
+      winner_id = CASE
+        WHEN d.player1_score > d.player2_score THEN d.player1_id
+        WHEN d.player2_score > d.player1_score THEN d.player2_id
+        ELSE NULL
+      END
+    FROM configurations c
+    WHERE c.id = d.configuration_id
+      AND d.is_finished = FALSE
+      AND d.started_at IS NOT NULL
+      AND d.started_at + (c.timer * INTERVAL '1 second') <= NOW()
+    `
+  );
+};
+
 exports.matchOpponent = async (
   userId,
   configurationId,
@@ -13,6 +37,7 @@ exports.matchOpponent = async (
 
   try {
     await client.query("BEGIN");
+    await exports.finishExpiredDuels(client);
 
     const { rows } = await client.query(
       `
@@ -111,6 +136,7 @@ exports.joinQueue = async (userId, configurationId) => {
 
   try {
     await client.query("BEGIN");
+    await exports.finishExpiredDuels(client);
 
     const activeDuel = await client.query(
       `
@@ -231,6 +257,8 @@ exports.getDuel = async (duelId) => {
 
 // NEW: used by the challenger's lobby to find out the duel was created
 exports.getActiveDuelForUser = async (userId) => {
+  await exports.finishExpiredDuels();
+
   const result = await pool.query(
     `
     SELECT d.id
@@ -541,6 +569,8 @@ exports.createDuel = async (
   player2Id,
   configurationId
 ) => {
+  await exports.finishExpiredDuels();
+
   const result = await pool.query(
     `
     INSERT INTO duels (
