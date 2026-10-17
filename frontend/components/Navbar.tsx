@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/", label: "Home", auth: false },
   { href: "/dashboard", label: "Profile", auth: true },
   { href: "/leaderboard", label: "Leaderboard", auth: true },
+  { href: "/worldchat", label: "World chat", auth: true },
   { href: "/duel", label: "Duel", auth: true },
 ];
 
