@@ -1,4 +1,3 @@
-
 const pool = require("../db");
 
 const sameId = (a, b) =>
@@ -230,6 +229,23 @@ exports.getDuel = async (duelId) => {
   return result.rows[0] || null;
 };
 
+// NEW: used by the challenger's lobby to find out the duel was created
+exports.getActiveDuelForUser = async (userId) => {
+  const result = await pool.query(
+    `
+    SELECT id
+    FROM duels
+    WHERE is_finished = FALSE
+      AND (player1_id = $1 OR player2_id = $1)
+    ORDER BY id DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+};
+
 exports.saveCurrentQuestion = async (
   duelId,
   question,
@@ -331,10 +347,15 @@ exports.updateScore = async (
   return result.rows[0] || null;
 };
 
+// First correct answer wins the point and clears the question.
+// A wrong answer locks that player out; if both are wrong, the question clears.
+// `question` is the text the client saw; if it no longer matches the current
+// question, the answer is stale (the opponent was faster) and is ignored.
 exports.resolveAnswer = async (
   duelId,
   playerId,
-  answer
+  answer,
+  question
 ) => {
   const client = await pool.connect();
 
@@ -378,6 +399,18 @@ exports.resolveAnswer = async (
       await client.query("COMMIT");
       return {
         status: "no_question",
+        duel
+      };
+    }
+
+    // Ignore answers to a question that has already been replaced
+    if (
+      question != null &&
+      String(question) !== String(duel.current_question)
+    ) {
+      await client.query("COMMIT");
+      return {
+        status: "stale",
         duel
       };
     }

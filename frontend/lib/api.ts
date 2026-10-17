@@ -1,4 +1,3 @@
-
 import type {
   ApiErrorBody,
   LoginPayload,
@@ -120,22 +119,11 @@ export function resolveAvatarUrl(
   return `${ASSET_BASE_URL}${avatar.startsWith("/") ? "" : "/"}${avatar}`;
 }
 
-export async function getDuelById(duelId: string) {
-  const response = await fetch(
-    `${DUEL_API_URL}/${encodeURIComponent(duelId)}`,
-    {
-      method: "GET",
-      credentials: "include",
-    }
+export function getDuelById(duelId: string) {
+  return request<{ success: boolean; duel: unknown }>(
+    DUEL_API_URL,
+    `/${encodeId(duelId)}`
   );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Failed to load duel details");
-  }
-
-  return data;
 }
 
 export function registerUser(
@@ -409,6 +397,10 @@ export function getLeaderboard(): Promise<LeaderboardResponse> {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Duels                                                               */
+/* ------------------------------------------------------------------ */
+
 export function joinDuel(
   configurationId: string | number
 ): Promise<JoinDuelResponse> {
@@ -432,6 +424,13 @@ export function joinDuel(
 
 export function getDuelStatus(): Promise<DuelStatusResponse> {
   return request<DuelStatusResponse>(DUEL_API_URL, "/status");
+}
+
+export function getActiveDuel(): Promise<{
+  success: boolean;
+  duelId: string | number | null;
+}> {
+  return request(DUEL_API_URL, "/active");
 }
 
 export function leaveDuelQueue(): Promise<{
@@ -515,7 +514,8 @@ export function getDuelQuestion(
 
 export function submitDuelAnswer(
   duelId: string,
-  answer: number | string
+  answer: number | string,
+  question?: string
 ): Promise<DuelAnswerResponse> {
   const normalizedDuelId = String(duelId ?? "").trim();
   const answerText = String(answer ?? "").trim();
@@ -525,24 +525,18 @@ export function submitDuelAnswer(
     return Promise.reject(new Error("Invalid duel ID."));
   }
 
-  if (
-    answerText === "" ||
-    !Number.isFinite(numericAnswer)
-  ) {
+  if (answerText === "" || !Number.isFinite(numericAnswer)) {
     return Promise.reject(
       new Error("Enter a valid numeric answer.")
     );
   }
 
-  return request<DuelAnswerResponse>(
-    DUEL_API_URL,
-    "/answer",
-    {
-      method: "POST",
-      body: {
-        duelId: normalizedDuelId,
-        answer: numericAnswer,
-      },
-    }
-  );
+  return request<DuelAnswerResponse>(DUEL_API_URL, "/answer", {
+    method: "POST",
+    body: {
+      duelId: normalizedDuelId,
+      answer: numericAnswer,
+      question,
+    },
+  });
 }

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +7,7 @@ import { getDuelQuestion, submitDuelAnswer } from "@/lib/api";
 type DuelResponse = {
   success: boolean;
   gameOver?: boolean;
+  isPlayer1?: boolean;
   question?: string | null;
   player1Score?: number;
   player2Score?: number;
@@ -17,6 +17,7 @@ type DuelResponse = {
   opponentAnswered?: boolean;
   waitingForOpponent?: boolean;
   remainingTime?: number;
+  winnerId?: string | number | null;
   duel?: {
     player1_id: string | number;
     player2_id: string | number;
@@ -42,6 +43,7 @@ export default function DuelPage() {
   const [answerInput, setAnswerInput] = useState("");
   const [player1Score, setPlayer1Score] = useState(0);
   const [player2Score, setPlayer2Score] = useState(0);
+  const [isPlayer1, setIsPlayer1] = useState<boolean | null>(null);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
   const [opponentAnswered, setOpponentAnswered] = useState(false);
@@ -70,64 +72,67 @@ export default function DuelPage() {
     }
   }, []);
 
-  const applyDuelState = useCallback(
-    (data: DuelResponse) => {
-      if (typeof data.player1Score === "number") {
-        setPlayer1Score(data.player1Score);
-      }
+  const applyDuelState = useCallback((data: DuelResponse) => {
+    if (typeof data.isPlayer1 === "boolean") {
+      setIsPlayer1(data.isPlayer1);
+    }
 
-      if (typeof data.player2Score === "number") {
-        setPlayer2Score(data.player2Score);
-      }
+    if (typeof data.player1Score === "number") {
+      setPlayer1Score(data.player1Score);
+    }
 
-      if (typeof data.remainingTime === "number") {
-        setRemainingTime(data.remainingTime);
-      }
+    if (typeof data.player2Score === "number") {
+      setPlayer2Score(data.player2Score);
+    }
 
-      if (data.duel) {
-        setPlayer1Score(data.duel.player1_score);
-        setPlayer2Score(data.duel.player2_score);
-        setWinnerId(data.duel.winner_id ?? null);
-      }
+    if (typeof data.remainingTime === "number") {
+      setRemainingTime(data.remainingTime);
+    }
 
-      if (data.gameOver) {
-        gameOverRef.current = true;
-        setGameOver(true);
-        setAnswered(true);
-        return;
-      }
+    if (data.duel) {
+      setPlayer1Score(data.duel.player1_score);
+      setPlayer2Score(data.duel.player2_score);
+      setWinnerId(data.duel.winner_id ?? null);
+    }
 
-      if (data.question && data.question !== lastQuestionRef.current) {
-        lastQuestionRef.current = data.question;
-        setQuestion(data.question);
-        setAnswerInput("");
-        setAnswered(false);
-        setOpponentAnswered(false);
-        setWaitingForOpponent(false);
-        setLastResult(null);
-      }
+    if (data.winnerId !== undefined) {
+      setWinnerId(data.winnerId);
+    }
 
-      if (typeof data.answered === "boolean") {
-        setAnswered(data.answered);
-      } else if (playerId !== null && data.duel) {
-        const isPlayer1 =
-          String(data.duel.player1_id) === String(playerId);
+    if (data.gameOver) {
+      gameOverRef.current = true;
+      setGameOver(true);
+      setAnswered(true);
+      return;
+    }
 
-        setAnswered(
-          isPlayer1
-            ? Boolean(data.player1Answered)
-            : Boolean(data.player2Answered)
-        );
-      }
+    // A new question (or the same one after a reset) means a fresh round
+    if (data.question && data.question !== lastQuestionRef.current) {
+      lastQuestionRef.current = data.question;
+      setQuestion(data.question);
+      setAnswerInput("");
+      setAnswered(false);
+      setOpponentAnswered(false);
+      setWaitingForOpponent(false);
+      setLastResult(null);
+    }
 
-      if (typeof data.opponentAnswered === "boolean") {
-        setOpponentAnswered(data.opponentAnswered);
-      }
+    // The question was cleared (someone scored). Forget it so the next
+    // poll can load the new one, even if the text happens to be identical.
+    if (data.question === null) {
+      lastQuestionRef.current = "";
+    }
 
-      setWaitingForOpponent(Boolean(data.waitingForOpponent));
-    },
-    [playerId]
-  );
+    if (typeof data.answered === "boolean") {
+      setAnswered(data.answered);
+    }
+
+    if (typeof data.opponentAnswered === "boolean") {
+      setOpponentAnswered(data.opponentAnswered);
+    }
+
+    setWaitingForOpponent(Boolean(data.waitingForOpponent));
+  }, []);
 
   const pollQuestion = useCallback(async () => {
     if (!duelId || gameOverRef.current || pollInProgressRef.current) {
@@ -161,65 +166,78 @@ export default function DuelPage() {
     return () => window.clearInterval(interval);
   }, [duelId, pollQuestion]);
 
- 
-const handleSubmit = async (
-  e: React.FormEvent<HTMLFormElement>
-) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
 
-  if (!answerInput.trim() || submitting || gameOver) {
-    return;
-  }
+    if (!answerInput.trim() || submitting || gameOver || answered) {
+      return;
+    }
 
-  const numericAnswer = Number(answerInput.trim());
+    const numericAnswer = Number(answerInput.trim());
 
-  if (!Number.isFinite(numericAnswer)) {
-    setError("Enter a valid numeric answer.");
-    return;
-  }
+    if (!Number.isFinite(numericAnswer)) {
+      setError("Enter a valid numeric answer.");
+      return;
+    }
 
-  try {
-    setSubmitting(true);
-    setError("");
+    const submittedQuestion = question;
 
-    const response = await submitDuelAnswer(
-      duelId,
-      numericAnswer
-    );
+    try {
+      setSubmitting(true);
+      setError("");
 
-    setAnswerInput("");
+      const data = (await submitDuelAnswer(
+        duelId,
+        numericAnswer,
+        submittedQuestion
+      )) as AnswerResponse;
 
-    // Keep your existing response-handling logic here.
-  } catch (err) {
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Failed to submit answer."
-    );
-  } finally {
-    setSubmitting(false);
-  }
-};
+      setAnswerInput("");
 
+      if (data.success) {
+        applyDuelState(data);
 
-  const isPlayer1 =
-    playerId !== null &&
-    question !== "" &&
-    typeof window !== "undefined" &&
-    (() => {
-      const stored = localStorage.getItem(`duel:${duelId}`);
-      if (!stored) return null;
-
-      try {
-        const duel = JSON.parse(stored);
-        return String(duel.player1_id) === String(playerId);
-      } catch {
-        return null;
+        if (!data.gameOver) {
+          setLastResult(
+            data.correct
+              ? "Correct! +1 point"
+              : "Wrong answer. Waiting for your opponent..."
+          );
+        }
       }
-    })();
 
-  const ownScore = isPlayer1 === true ? player1Score : player2Score;
-  const opponentScore = isPlayer1 === true ? player2Score : player1Score;
+      // Fetch the next question right away instead of waiting for the poll
+      pollInProgressRef.current = false;
+      await pollQuestion();
+
+      if (data.success && !data.gameOver) {
+        setLastResult(
+          data.correct
+            ? "Correct! +1 point"
+            : "Wrong answer. Waiting for your opponent..."
+        );
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to submit answer.";
+
+      setAnswerInput("");
+      pollInProgressRef.current = false;
+      await pollQuestion();
+
+      if (message.toLowerCase().includes("too late")) {
+        // The opponent scored first and the question already changed
+        setLastResult("Too late! Your opponent answered first.");
+      } else {
+        setError(message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const ownScore = isPlayer1 === false ? player2Score : player1Score;
+  const opponentScore = isPlayer1 === false ? player1Score : player2Score;
 
   const resultText = gameOver
     ? winnerId == null
