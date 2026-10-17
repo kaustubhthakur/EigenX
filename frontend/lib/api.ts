@@ -544,3 +544,91 @@ export function submitDuelAnswer(
     },
   });
 }
+
+
+
+export function getWorldMessages(
+  limit = 50,
+  beforeId?: string | number
+): Promise<WorldMessagesResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (beforeId !== undefined) params.set("beforeId", String(beforeId));
+
+  return request<WorldMessagesResponse>(
+    WORLDCHAT_API_URL,
+    `/messages?${params.toString()}`
+  );
+}
+
+export function postWorldMessage(
+  content: string
+): Promise<WorldPostMessageResponse> {
+  return request<WorldPostMessageResponse>(WORLDCHAT_API_URL, "/messages", {
+    method: "POST",
+    body: { content },
+  });
+}
+
+export function deleteWorldMessage(
+  messageId: string | number
+): Promise<{ id: string | number }> {
+  return request(WORLDCHAT_API_URL, `/messages/${encodeId(messageId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function getWorldOnline(): Promise<WorldOnlineResponse> {
+  return request<WorldOnlineResponse>(WORLDCHAT_API_URL, "/online");
+}
+
+export function getWorldProfile(
+  userId: string | number
+): Promise<WorldProfileResponse> {
+  return request<WorldProfileResponse>(
+    WORLDCHAT_API_URL,
+    `/users/${encodeId(userId)}`
+  );
+}
+
+export function sendWorldDuelRequest(
+  receiverId: string | number
+): Promise<WorldRequestResponse> {
+  return request<WorldRequestResponse>(WORLDCHAT_API_URL, "/duels", {
+    method: "POST",
+    body: { receiverId },
+  });
+}
+
+export function getWorldIncoming(): Promise<WorldRequestsResponse> {
+  return request<WorldRequestsResponse>(WORLDCHAT_API_URL, "/duels/incoming");
+}
+
+export function getWorldOutgoing(): Promise<WorldRequestsResponse> {
+  return request<WorldRequestsResponse>(WORLDCHAT_API_URL, "/duels/outgoing");
+}
+
+export function acceptWorldDuel(
+  requestId: string | number
+): Promise<WorldAcceptResponse> {
+  return request<WorldAcceptResponse>(
+    WORLDCHAT_API_URL,
+    `/duels/${encodeId(requestId)}/accept`,
+    { method: "POST" }
+  );
+}
+
+export function declineWorldDuel(
+  requestId: string | number
+): Promise<{ requestId: string | number; status: string }> {
+  return request(WORLDCHAT_API_URL, `/duels/${encodeId(requestId)}/decline`, {
+    method: "POST",
+  });
+}
+
+export function cancelWorldDuel(
+  requestId: string | number
+): Promise<{ requestId: string | number; status: string }> {
+  return request(WORLDCHAT_API_URL, `/duels/${encodeId(requestId)}`, {
+    method: "DELETE",
+  });
+}
