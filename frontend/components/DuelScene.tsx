@@ -11,8 +11,11 @@ import { useEffect, useRef } from "react";
  */
 export default function DuelScene({
   focus = "side",
+  calm = false,
 }: {
   focus?: "side" | "center";
+  /** Fewer, fainter symbols. Use on data-heavy pages (profile, leaderboard). */
+  calm?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -116,13 +119,13 @@ export default function DuelScene({
       const floaters: Floater[] = [];
       const spriteMats: Array<InstanceType<typeof THREE.SpriteMaterial>> = [];
 
-      for (let i = 0; i < 22; i++) {
+      for (let i = 0; i < (calm ? 9 : 22); i++) {
         const texture = textures[i % textures.length];
         if (!texture) continue;
         const mat = new THREE.SpriteMaterial({
           map: texture,
           transparent: true,
-          opacity: 0.16 + Math.random() * 0.3,
+          opacity: (0.16 + Math.random() * 0.3) * (calm ? 0.45 : 1),
           depthWrite: false,
         });
         spriteMats.push(mat);
@@ -158,7 +161,7 @@ export default function DuelScene({
         color: 0xc7d2fe,
         size: 0.05,
         transparent: true,
-        opacity: 0.55,
+        opacity: calm ? 0.35 : 0.55,
         depthWrite: false,
       });
       const dust = new THREE.Points(dustGeo, dustMat);
@@ -252,7 +255,7 @@ export default function DuelScene({
       disposed = true;
       cleanup();
     };
-  }, [focus]);
+  }, [focus, calm]);
 
   return (
     <div
