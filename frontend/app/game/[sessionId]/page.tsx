@@ -1,10 +1,12 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getQuestion, submitAnswer } from "../../../lib/api";
+import DuelScene from "../../../components/DuelScene";
 
 const CountdownOrb = dynamic(() => import("../../../components/CountdownOrb"), {
   ssr: false,
@@ -12,6 +14,13 @@ const CountdownOrb = dynamic(() => import("../../../components/CountdownOrb"), {
 });
 
 type Phase = "loading" | "playing" | "gameover" | "error";
+
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
+const primaryButton = `bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`;
+
+const ghostButton = `bg-white/5 text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 ${focusRing}`;
 
 export default function GameSessionPage({
   params,
@@ -119,8 +128,11 @@ export default function GameSessionPage({
     return (
       <Shell>
         <div className="flex flex-col items-center gap-3 px-6 py-20">
-          <span className="h-7 w-7 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-          <p className="text-sm text-slate-500">Loading your session…</p>
+          <span
+            className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-cyan-300 motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <p className="text-sm text-slate-400">Loading your session…</p>
         </div>
       </Shell>
     );
@@ -130,17 +142,27 @@ export default function GameSessionPage({
     return (
       <Shell>
         <div className="flex flex-col items-center px-6 py-14 text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-50 text-rose-600">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/10 text-rose-300 ring-1 ring-rose-400/30">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v4M12 16h.01" />
             </svg>
           </span>
-          <h1 className="mt-4 text-lg font-semibold text-slate-900">Something went wrong</h1>
-          <p className="mt-1 max-w-xs text-sm text-slate-500">{errorMsg}</p>
+          <h1 className="mt-4 text-lg font-semibold text-white">Something went wrong</h1>
+          <p className="mt-1 max-w-xs text-sm text-slate-400">{errorMsg}</p>
           <Link
             href="/"
-            className="mt-6 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+            className={`mt-6 rounded-lg px-5 py-2.5 text-sm font-semibold ${primaryButton}`}
           >
             Back to home
           </Link>
@@ -153,19 +175,23 @@ export default function GameSessionPage({
     return (
       <Shell>
         <div className="flex flex-col items-center px-6 py-14 text-center">
-          <h1 className="text-sm font-medium text-slate-500">Session complete</h1>
-          <p className="mt-3 text-6xl font-semibold tabular-nums tracking-tight text-slate-900">{score}</p>
-          <p className="mt-1 text-sm text-slate-500">{score === 1 ? "point" : "points"} scored</p>
+          <h1 className="text-sm font-medium text-slate-400">Session complete</h1>
+          <p className="mt-3 bg-gradient-to-r from-indigo-300 via-violet-200 to-cyan-200 bg-clip-text text-7xl font-semibold tabular-nums tracking-tight text-transparent">
+            {score}
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            {score === 1 ? "point" : "points"} scored
+          </p>
           <div className="mt-8 flex w-full max-w-xs flex-col gap-2 sm:flex-row">
             <Link
               href="/"
-              className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+              className={`flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${primaryButton}`}
             >
               Play again
             </Link>
             <Link
               href="/dashboard"
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              className={`flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-medium ${ghostButton}`}
             >
               View profile
             </Link>
@@ -178,17 +204,17 @@ export default function GameSessionPage({
   return (
     <Shell>
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
         <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           </span>
-          <span className="text-sm font-medium text-slate-600">Session in progress</span>
+          <span className="text-sm font-medium text-slate-300">Session in progress</span>
         </div>
-        <div className="flex items-baseline gap-1.5 rounded-full bg-slate-50 px-3 py-1 ring-1 ring-inset ring-slate-200">
-          <span className="text-xs text-slate-500">Score</span>
-          <span className="text-sm font-semibold tabular-nums text-slate-900">{score}</span>
+        <div className="flex items-baseline gap-1.5 rounded-full bg-white/5 px-3 py-1 ring-1 ring-inset ring-white/15">
+          <span className="text-xs text-slate-400">Score</span>
+          <span className="text-sm font-semibold tabular-nums text-white">{score}</span>
         </div>
       </div>
 
@@ -198,15 +224,17 @@ export default function GameSessionPage({
 
         {/* Question */}
         <div
-          className={`mt-3 rounded-xl border px-6 py-8 text-center transition-colors duration-200 ${
+          className={`mt-3 rounded-xl px-6 py-8 text-center ring-1 transition-all duration-200 ${
             feedback === "correct"
-              ? "border-emerald-200 bg-emerald-50"
+              ? "bg-emerald-500/10 ring-emerald-400/50 shadow-[0_0_30px_-6px_rgba(52,211,153,0.5)]"
               : feedback === "wrong"
-                ? "border-rose-200 bg-rose-50"
-                : "border-slate-200 bg-slate-50/60"
+                ? "bg-rose-500/10 ring-rose-400/50 shadow-[0_0_30px_-6px_rgba(251,113,133,0.5)]"
+                : "bg-white/[0.04] ring-white/10"
           }`}
         >
-          <p className="text-4xl font-semibold tabular-nums tracking-tight text-slate-900">{question}</p>
+          <p className="bg-gradient-to-b from-white to-indigo-200 bg-clip-text text-5xl font-semibold tabular-nums tracking-tight text-transparent">
+            {question}
+          </p>
           <span className="sr-only" aria-live="polite">
             {feedback === "correct" ? "Correct" : feedback === "wrong" ? "Incorrect" : ""}
           </span>
@@ -223,27 +251,37 @@ export default function GameSessionPage({
             placeholder="Type your answer"
             aria-label="Your answer"
             autoFocus
-            className="h-12 min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 text-center text-lg font-semibold text-slate-900 shadow-sm transition placeholder:text-base placeholder:font-normal placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="h-12 min-w-0 flex-1 rounded-xl border-0 bg-white/5 px-4 text-center text-lg font-semibold tabular-nums text-white ring-1 ring-inset ring-white/15 transition placeholder:text-base placeholder:font-normal placeholder:text-slate-500 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             type="submit"
             disabled={submitting || !answer.trim()}
-            className="h-12 rounded-xl bg-indigo-600 px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`h-12 rounded-xl px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${primaryButton}`}
           >
             {submitting ? "Checking…" : "Submit"}
           </button>
         </form>
-        <p className="mt-3 hidden text-center text-xs text-slate-400 sm:block">Press Enter to submit</p>
+        <p className="mt-3 hidden text-center text-xs text-slate-500 sm:block">
+          Press Enter to submit
+        </p>
       </div>
     </Shell>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-lg px-4 py-10 sm:py-14">
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {children}
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] text-slate-100">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_35%,rgba(99,102,241,0.22),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.12),transparent)]"
+      />
+      <DuelScene focus="center" />
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-lg items-center px-4 py-10 sm:py-14">
+        <div className="w-full overflow-hidden rounded-2xl bg-slate-900/60 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-xl">
+          {children}
+        </div>
       </div>
     </div>
   );
