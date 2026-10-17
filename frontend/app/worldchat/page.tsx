@@ -15,7 +15,6 @@ import {
   getActiveDuel,
   getWorldIncoming,
   getWorldMessages,
-  getWorldOnline,
   getWorldOutgoing,
   postWorldMessage,
   sendWorldDuelRequest,
@@ -23,7 +22,6 @@ import {
 import type {
   WorldDuelRequest,
   WorldMessage,
-  WorldUser,
 } from "../../types/worldchat";
 
 /** ADAPT: where your duel screen lives. */
@@ -31,6 +29,9 @@ const duelRoute = (duelId: string | number) => `/duel/${duelId}`;
 
 const MAX_LENGTH = 500;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+const gutter =
+  "px-4 sm:px-8 lg:px-[max(2rem,calc(50%_-_28rem))]";
 
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
@@ -51,7 +52,6 @@ export default function WorldChatPage() {
   const myId = user ? String(user.id) : "";
 
   const [messages, setMessages] = useState<WorldMessage[]>([]);
-  const [online, setOnline] = useState<WorldUser[]>([]);
   const [incoming, setIncoming] = useState<WorldDuelRequest[]>([]);
   const [outgoing, setOutgoing] = useState<WorldDuelRequest[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
@@ -83,7 +83,7 @@ export default function WorldChatPage() {
     return () => clearTimeout(id);
   }, [notice]);
 
-  /* Polling: messages, online players, duel requests */
+  /* Polling: messages and duel requests */
   useEffect(() => {
     if (!user) return;
     let stopped = false;
@@ -99,16 +99,6 @@ export default function WorldChatPage() {
         if (!stopped) setLoadError((e as Error).message);
       } finally {
         if (!stopped) setLoadingMessages(false);
-      }
-    };
-
-    const tickOnline = async () => {
-      if (document.hidden) return;
-      try {
-        const res = await getWorldOnline();
-        if (!stopped) setOnline(res.users);
-      } catch {
-        /* keep the last list */
       }
     };
 
@@ -135,16 +125,13 @@ export default function WorldChatPage() {
     };
 
     tickMessages();
-    tickOnline();
     tickRequests();
     const a = setInterval(tickMessages, 3000);
-    const b = setInterval(tickOnline, 15000);
     const c = setInterval(tickRequests, 3000);
 
     return () => {
       stopped = true;
       clearInterval(a);
-      clearInterval(b);
       clearInterval(c);
     };
   }, [user, router]);
@@ -267,39 +254,33 @@ export default function WorldChatPage() {
   }
 
   return (
-    <main className="relative min-h-[calc(100vh-4rem)]">
+    <main className="relative h-[calc(100vh-4rem)] bg-[#070815]">
       <DuelScene calm />
 
-      <div className="relative z-10 mx-auto grid h-[calc(100vh-4rem)] max-w-6xl gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        {/* Chat panel */}
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0c1f]/75 backdrop-blur-xl">
-          <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-            <div>
-              <h1 className="text-base font-semibold text-white">World chat</h1>
-              <p className="text-xs text-slate-500">
-                Tap a name to see their profile and challenge them
-              </p>
-            </div>
-            <span className="flex items-center gap-1.5 text-xs text-slate-400">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              {online.length} online
-            </span>
+      <section className="relative z-10 flex h-full min-h-0 flex-col bg-[#0b0c1f]/60 backdrop-blur-xl">
+          <header className={`border-b border-white/10 py-3 ${gutter}`}>
+            <h1 className="text-base font-semibold text-white">World chat</h1>
+            <p className="text-xs text-slate-500">
+              Tap a name to see their profile and challenge them
+            </p>
           </header>
 
-          <DuelRequests
-            incoming={incoming}
-            outgoing={outgoing}
-            busyId={busyId}
-            onAccept={handleAccept}
-            onDecline={handleDecline}
-            onCancel={handleCancel}
-          />
+          <div className="lg:px-[max(1.25rem,calc(50%_-_28.75rem))]">
+            <DuelRequests
+              incoming={incoming}
+              outgoing={outgoing}
+              busyId={busyId}
+              onAccept={handleAccept}
+              onDecline={handleDecline}
+              onCancel={handleCancel}
+            />
+          </div>
 
           <div className="relative min-h-0 flex-1">
             <div
               ref={listRef}
               onScroll={onScroll}
-              className="h-full overflow-y-auto px-4 py-4"
+              className={`h-full overflow-y-auto py-4 ${gutter}`}
               aria-live="polite"
             >
               {loadingMessages ? (
@@ -404,13 +385,16 @@ export default function WorldChatPage() {
           {notice && (
             <p
               role="status"
-              className="border-t border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-200"
+              className={`border-t border-white/10 bg-white/[0.04] py-2 text-sm text-slate-200 ${gutter}`}
             >
               {notice}
             </p>
           )}
 
-          <form onSubmit={handleSend} className="border-t border-white/10 p-3">
+          <form
+            onSubmit={handleSend}
+            className={`border-t border-white/10 py-3 ${gutter}`}
+          >
             <div className="flex items-center gap-2">
               <input
                 value={draft}
@@ -439,39 +423,6 @@ export default function WorldChatPage() {
           </form>
         </section>
 
-        {/* Online players (desktop) */}
-        <aside className="hidden min-h-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0b0c1f]/75 backdrop-blur-xl lg:flex">
-          <header className="border-b border-white/10 px-4 py-3">
-            <h2 className="text-sm font-semibold text-white">Online players</h2>
-          </header>
-          <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2">
-            {online.length === 0 ? (
-              <li className="px-2 py-6 text-center text-sm text-slate-500">
-                Nobody else is online
-              </li>
-            ) : (
-              online.map((p) => (
-                <li key={p.user_id}>
-                  <button
-                    type="button"
-                    onClick={() => setProfileId(p.user_id)}
-                    className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 ${focusRing}`}
-                  >
-                    <UserAvatar name={p.username} avatar={p.avatar} size={32} online />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-slate-200">
-                        {p.username}
-                        {String(p.user_id) === myId ? " (you)" : ""}
-                      </span>
-                      <span className="block text-xs text-slate-500">Level {p.level}</span>
-                    </span>
-                  </button>
-                </li>
-              ))
-            )}
-          </ul>
-        </aside>
-      </div>
 
       {profileId !== null && (
         <ProfileCard
