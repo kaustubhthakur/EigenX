@@ -128,10 +128,8 @@ export default function Navbar() {
   width={32}
   height={32}
   priority
-  className="h-8 w-8 rounded-lg object-contain"
+  className="h-8 w-8 object-contain mix-blend-multiply"
 />
-
- 
 
             <span className="text-[15px] font-semibold tracking-tight text-white">
               EigenX
