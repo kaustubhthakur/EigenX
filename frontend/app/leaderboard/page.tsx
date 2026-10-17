@@ -1,12 +1,15 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { Space_Grotesk } from "next/font/google";
 import { getLeaderboard, resolveAvatarUrl, type LeaderboardEntry } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import DuelScene from "../../components/DuelScene";
 
+// Used for the numerals only (scores, ranks and the 3D medals).
 const display = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "700"],
@@ -15,11 +18,17 @@ const display = Space_Grotesk({
 
 type Phase = "loading" | "loaded" | "error";
 
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
+const glass =
+  "rounded-2xl bg-slate-900/60 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+
 // Index = place (0 = first). x position and block height in scene units.
 const SLOTS = [
-  { label: "1st", n: "1", x: 0, height: 2.0, color: 0xe2b93b, hex: "#E2B93B", text: "text-[#8A6A00]", dot: "bg-[#E2B93B]" },
-  { label: "2nd", n: "2", x: -2.1, height: 1.4, color: 0xc4cad6, hex: "#C4CAD6", text: "text-[#555C6B]", dot: "bg-[#C4CAD6]" },
-  { label: "3rd", n: "3", x: 2.1, height: 0.9, color: 0xcd8b5a, hex: "#CD8B5A", text: "text-[#8F532B]", dot: "bg-[#CD8B5A]" },
+  { label: "1st", n: "1", x: 0, height: 2.0, color: 0xe2b93b, hex: "#E2B93B", text: "text-amber-300", dot: "bg-[#E2B93B]" },
+  { label: "2nd", n: "2", x: -2.1, height: 1.4, color: 0xc4cad6, hex: "#C4CAD6", text: "text-slate-300", dot: "bg-[#C4CAD6]" },
+  { label: "3rd", n: "3", x: 2.1, height: 0.9, color: 0xcd8b5a, hex: "#CD8B5A", text: "text-orange-300", dot: "bg-[#CD8B5A]" },
 ];
 
 const formatScore = (n: number | null | undefined) =>
@@ -30,6 +39,10 @@ const mix = (hex: string, to: number, amt: number) => {
   const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (to - v) * amt));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 };
+
+/* ------------------------------------------------------------------ */
+/* 3D helpers (unchanged logic)                                        */
+/* ------------------------------------------------------------------ */
 
 /** Square canvas texture that can be repainted (used once the web font has loaded). */
 function canvasTexture(
@@ -133,9 +146,9 @@ const paintPlate = (n: string, font: string, hex: string) => (ctx: CanvasRenderi
 /** Soft ground shadow. A wide faint one plus a tight dark one gives believable contact shading. */
 const paintBlob = (alpha: number) => (ctx: CanvasRenderingContext2D, s: number) => {
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, `rgba(20,20,40,${alpha})`);
-  g.addColorStop(0.65, `rgba(20,20,40,${alpha * 0.5})`);
-  g.addColorStop(1, "rgba(20,20,40,0)");
+  g.addColorStop(0, `rgba(0,0,10,${alpha})`);
+  g.addColorStop(0.65, `rgba(0,0,10,${alpha * 0.5})`);
+  g.addColorStop(1, "rgba(0,0,10,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
 };
@@ -149,9 +162,18 @@ const paintDot = (ctx: CanvasRenderingContext2D, s: number) => {
   ctx.fillRect(0, 0, s, s);
 };
 
+/** Soft indigo glow painted on the floor under the podium. */
+const paintGlow = (ctx: CanvasRenderingContext2D, s: number) => {
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, "rgba(129,140,248,0.55)");
+  g.addColorStop(0.5, "rgba(99,102,241,0.18)");
+  g.addColorStop(1, "rgba(99,102,241,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+};
+
 const PED_R = 0.95;
 const MEDAL_R = 0.47;
-
 
 function pedestalGeometry(h: number) {
   const R = PED_R;
@@ -210,6 +232,10 @@ function coinGeometry() {
   return geo;
 }
 
+/* ------------------------------------------------------------------ */
+/* UI pieces                                                           */
+/* ------------------------------------------------------------------ */
+
 function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
   const url = resolveAvatarUrl(entry.avatar);
   return url ? (
@@ -217,18 +243,38 @@ function Avatar({ entry, size }: { entry: LeaderboardEntry; size: string }) {
     <img
       src={url}
       alt=""
-      className={`${size} shrink-0 rounded-full object-cover ring-1 ring-black/5`}
+      className={`${size} shrink-0 rounded-full object-cover ring-2 ring-white/10`}
     />
   ) : (
     <span
       aria-hidden="true"
-      className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-gray-100 to-gray-200 text-xs font-semibold text-gray-600 ring-1 ring-black/5`}
+      className={`${size} flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-semibold text-white ring-2 ring-white/10`}
     >
       {entry.username?.[0]?.toUpperCase() || "?"}
     </span>
   );
 }
 
+function YouBadge() {
+  return (
+    <span className="shrink-0 rounded-full bg-indigo-400/15 px-1.5 py-px text-[10px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-300/30">
+      You
+    </span>
+  );
+}
+
+function Shell({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] text-slate-100">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_30%,rgba(99,102,241,0.22),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.12),transparent)]"
+      />
+      <DuelScene focus="center" />
+      <div className="relative z-10">{children}</div>
+    </div>
+  );
+}
 
 function PodiumScene({
   podium,
@@ -263,6 +309,7 @@ function PodiumScene({
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
 
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
@@ -282,13 +329,11 @@ function PodiumScene({
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
 
-
     const pmrem = track(new THREE.PMREMGenerator(renderer));
     const envRT = track(pmrem.fromScene(new RoomEnvironment(), 0.04));
     scene.environment = envRT.texture;
 
-
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xdfe3ee, 0.35));
+    scene.add(new THREE.HemisphereLight(0xdde3ff, 0x1a1c3a, 0.4));
     const key = new THREE.DirectionalLight(0xfff3e0, 2.1);
     key.position.set(4, 8, 6);
     key.castShadow = true;
@@ -297,17 +342,31 @@ function PodiumScene({
     key.shadow.normalBias = 0.02;
     Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 2, far: 22 });
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0xdfe8ff, 0.9);
+    const rim = new THREE.DirectionalLight(0xa5b4fc, 1.1);
     rim.position.set(-5, 4, -4);
     scene.add(rim);
 
     const stage = new THREE.Group();
     scene.add(stage);
 
-  
+    // Indigo glow on the floor, then shadows on top of it.
+    const glowGeo = track(new THREE.PlaneGeometry(10, 5));
+    const glowMat = track(
+      new THREE.MeshBasicMaterial({
+        map: makeTex(256, paintGlow),
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+      })
+    );
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(0, 0.001, 0);
+    stage.add(glow);
+
     const ground = new THREE.Mesh(
       track(new THREE.PlaneGeometry(20, 20)),
-      track(new THREE.ShadowMaterial({ opacity: 0.18 }))
+      track(new THREE.ShadowMaterial({ opacity: 0.45 }))
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
@@ -316,7 +375,7 @@ function PodiumScene({
     const blobWideGeo = track(new THREE.PlaneGeometry(3.8, 3.8));
     const blobWideMat = track(
       new THREE.MeshBasicMaterial({
-        map: makeTex(256, paintBlob(0.2)),
+        map: makeTex(256, paintBlob(0.35)),
         transparent: true,
         depthWrite: false,
         toneMapped: false,
@@ -325,7 +384,7 @@ function PodiumScene({
     const blobTightGeo = track(new THREE.PlaneGeometry(2.9, 2.9));
     const blobTightMat = track(
       new THREE.MeshBasicMaterial({
-        map: makeTex(256, paintBlob(0.5)),
+        map: makeTex(256, paintBlob(0.6)),
         transparent: true,
         depthWrite: false,
         toneMapped: false,
@@ -350,7 +409,7 @@ function PodiumScene({
 
       const ceramic = track(
         new THREE.MeshPhysicalMaterial({
-          color: mine ? 0xe4e6ff : 0xf7f7f9,
+          color: mine ? 0xcdd1ff : 0xe4e6f2,
           roughness: 0.5,
           roughnessMap: grain,
           metalness: 0,
@@ -369,7 +428,6 @@ function PodiumScene({
           envMapIntensity: 1.25,
         })
       );
-
 
       const ped = new THREE.Group();
       ped.position.x = slot.x;
@@ -416,7 +474,6 @@ function PodiumScene({
       blobTight.position.set(slot.x, 0.003, 0.02);
       stage.add(blobWide, blobTight);
 
-
       const faceTex = makeTex(1024, paintMedalFace(slot.n, fontFamily));
       const bumpTex = makeTex(1024, paintMedalBump(slot.n, fontFamily));
       bumpTex.colorSpace = THREE.NoColorSpace;
@@ -450,7 +507,7 @@ function PodiumScene({
       medals.push({ float, spin, baseY });
     });
 
-    // Faint dust motes drifting up through the light.
+    // Faint motes drifting up through the light.
     const SPARKS = 28;
     const sparkGeo = track(new THREE.BufferGeometry());
     const sparkPos = new Float32Array(SPARKS * 3);
@@ -474,7 +531,7 @@ function PodiumScene({
           color: 0xf0d27a,
           size: 0.055,
           transparent: true,
-          opacity: 0.6,
+          opacity: 0.7,
           depthWrite: false,
           toneMapped: false,
         })
@@ -482,7 +539,6 @@ function PodiumScene({
     );
     stage.add(sparks);
 
-    
     document.fonts
       .load(`700 64px ${fontFamily}`)
       .then(() => {
@@ -490,7 +546,6 @@ function PodiumScene({
       })
       .catch(() => {});
 
-    
     let targetRot = 0;
     let pointerActive = false;
     const onPointer = (e: PointerEvent) => {
@@ -550,7 +605,7 @@ function PodiumScene({
 
       renderer.render(scene, camera);
 
-      
+      // Keep the HTML name tags pinned above each medal.
       medals.forEach(({ float }, i) => {
         const el = labelRefs.current[i];
         if (!el) return;
@@ -598,22 +653,20 @@ function PodiumScene({
                 labelRefs.current[i] = el;
               }}
               style={{ opacity: 0 }}
-              className={`absolute left-0 top-0 flex items-center gap-2.5 rounded-xl px-2.5 py-2 shadow-[0_10px_28px_-10px_rgba(17,24,39,0.28)] backdrop-blur transition-opacity duration-500 ${
-                mine ? "bg-[#EEF0FF]/95" : "bg-white/95"
+              className={`absolute left-0 top-0 flex items-center gap-2.5 rounded-xl px-2.5 py-2 ring-1 backdrop-blur-xl transition-opacity duration-500 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] ${
+                mine
+                  ? "bg-indigo-950/80 ring-indigo-300/40"
+                  : "bg-slate-900/80 ring-white/15"
               }`}
             >
               <Avatar entry={entry} size="h-8 w-8 sm:h-9 sm:w-9" />
               <div className="max-w-[88px] sm:max-w-[140px]">
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-white">
                   <span className="truncate">{entry.username}</span>
-                  {mine && (
-                    <span className="shrink-0 rounded-full bg-[#4F46E5]/10 px-1.5 py-px text-[10px] font-medium text-[#4F46E5]">
-                      You
-                    </span>
-                  )}
+                  {mine && <YouBadge />}
                 </p>
                 <p className="mt-0.5 flex items-center gap-1.5 tabular-nums">
-                  <span className={`${display.className} text-sm font-bold leading-none text-gray-900`}>
+                  <span className={`${display.className} text-sm font-bold leading-none text-white`}>
                     {formatScore(entry.top_score)}
                   </span>
                   <span className={`flex items-center gap-1 text-[11px] font-medium ${SLOTS[i].text}`}>
@@ -636,21 +689,25 @@ function SummaryStrip({
   items: { label: string; value: string; hint?: string; accent?: boolean }[];
 }) {
   return (
-    <dl className="mb-6 grid grid-cols-2 divide-x divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:grid-cols-4">
+    <dl
+      className={`mb-6 grid grid-cols-2 divide-x divide-white/10 overflow-hidden sm:grid-cols-4 ${glass}`}
+    >
       {items.map((item, i) => (
         <div
           key={item.label}
-          className={`px-4 py-3.5 sm:px-5 ${i > 1 ? "border-t border-gray-100 sm:border-t-0" : ""}`}
+          className={`px-4 py-4 sm:px-5 ${i > 1 ? "border-t border-white/10 sm:border-t-0" : ""}`}
         >
-          <dt className="text-xs font-medium text-gray-500">{item.label}</dt>
+          <dt className="text-xs font-medium text-slate-400">{item.label}</dt>
           <dd
-            className={`${display.className} mt-1 text-xl font-bold tabular-nums ${
-              item.accent ? "text-[#4F46E5]" : "text-gray-900"
+            className={`${display.className} mt-1 truncate text-xl font-bold tabular-nums ${
+              item.accent
+                ? "bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent"
+                : "text-white"
             }`}
           >
             {item.value}
           </dd>
-          {item.hint && <p className="mt-0.5 text-xs text-gray-400">{item.hint}</p>}
+          {item.hint && <p className="mt-0.5 text-xs text-slate-500">{item.hint}</p>}
         </div>
       ))}
     </dl>
@@ -659,29 +716,37 @@ function SummaryStrip({
 
 function Skeleton() {
   return (
-    <div className="min-h-screen bg-gray-50" aria-busy="true" aria-live="polite">
-      <div className="mx-auto max-w-3xl animate-pulse px-4 py-12 sm:py-16">
-        <div className="mx-auto h-9 w-48 rounded-lg bg-gray-200" />
-        <div className="mx-auto mt-3 h-4 w-64 rounded bg-gray-200" />
-        <div className="mt-8 h-20 rounded-xl border border-gray-200 bg-white" />
-        <div className="mt-6 h-[380px] rounded-2xl bg-gray-100/70 sm:h-[440px]" />
-        <div className="mt-8 space-y-px overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <Shell>
+      <div
+        className="mx-auto max-w-3xl animate-pulse px-4 py-12 sm:py-16"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <div className="mx-auto h-9 w-48 rounded-lg bg-white/10" />
+        <div className="mx-auto mt-3 h-4 w-64 rounded bg-white/10" />
+        <div className="mt-8 h-20 rounded-2xl bg-white/5 ring-1 ring-white/10" />
+        <div className="mt-6 h-[380px] rounded-2xl bg-white/[0.03] sm:h-[440px]" />
+        <div className="mt-8 space-y-px overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
-              <div className="h-4 w-6 rounded bg-gray-100" />
-              <div className="h-9 w-9 rounded-full bg-gray-100" />
+              <div className="h-4 w-6 rounded bg-white/10" />
+              <div className="h-9 w-9 rounded-full bg-white/10" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 w-32 rounded bg-gray-100" />
-                <div className="h-2.5 w-24 rounded bg-gray-100" />
+                <div className="h-3 w-32 rounded bg-white/10" />
+                <div className="h-2.5 w-24 rounded bg-white/10" />
               </div>
-              <div className="h-4 w-10 rounded bg-gray-100" />
+              <div className="h-4 w-10 rounded bg-white/10" />
             </div>
           ))}
         </div>
       </div>
-    </div>
+    </Shell>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
@@ -725,22 +790,24 @@ export default function LeaderboardPage() {
 
   if (phase === "error") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center bg-gray-50 px-4 text-center">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 8v4M12 16h.01" />
-          </svg>
-        </span>
-        <p className="mt-4 text-sm font-semibold text-gray-900">Couldn&apos;t load the leaderboard</p>
-        <p className="mt-1 max-w-sm text-sm text-gray-500">{errorMsg}</p>
-        <button
-          onClick={load}
-          className="mt-5 rounded-lg bg-[#4F46E5] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4338CA] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] focus-visible:ring-offset-2"
-        >
-          Try again
-        </button>
-      </div>
+      <Shell>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-400/30">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </span>
+          <p className="mt-4 text-sm font-semibold text-white">Couldn&apos;t load the leaderboard</p>
+          <p className="mt-1 max-w-sm text-sm text-slate-400">{errorMsg}</p>
+          <button
+            onClick={load}
+            className={`mt-5 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`}
+          >
+            Try again
+          </button>
+        </div>
+      </Shell>
     );
   }
 
@@ -767,13 +834,13 @@ export default function LeaderboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Shell>
       <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
         <header className="mb-8 text-center">
-          <h1 className={`${display.className} text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl`}>
+          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             Leaderboard
           </h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-3 text-base text-slate-400">
             {entries.length > 0
               ? `${entries.length.toLocaleString("en-US")} ${entries.length === 1 ? "player" : "players"} ranked by best score`
               : "Rankings update as players finish games"}
@@ -781,9 +848,9 @@ export default function LeaderboardPage() {
         </header>
 
         {entries.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center">
-            <p className="text-sm font-semibold text-gray-900">No scores yet</p>
-            <p className="mt-1 text-sm text-gray-500">Finish a game to claim the first spot.</p>
+          <div className={`${glass} border border-dashed border-white/15 px-6 py-16 text-center`}>
+            <p className="text-sm font-semibold text-white">No scores yet</p>
+            <p className="mt-1 text-sm text-slate-400">Finish a game to claim the first spot.</p>
           </div>
         ) : (
           <>
@@ -792,13 +859,13 @@ export default function LeaderboardPage() {
             <PodiumScene podium={podium} meId={meId} />
 
             {rest.length > 0 && (
-              <section className="mt-8 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="flex items-center gap-3 border-b border-gray-100 bg-gray-50/70 px-4 py-2.5 text-xs font-medium text-gray-500 sm:gap-4 sm:px-5">
+              <section className={`mt-8 overflow-hidden ${glass}`}>
+                <div className="flex items-center gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-slate-400 sm:gap-4 sm:px-5">
                   <span className="w-10 shrink-0 text-center">Rank</span>
                   <span className="flex-1">Player</span>
                   <span>Best score</span>
                 </div>
-                <ol className="divide-y divide-gray-100">
+                <ol className="divide-y divide-white/5">
                   {rest.map((entry) => {
                     const mine = meId !== null && String(entry.id) === meId;
                     const tied = tiedRanks.has(entry.rank);
@@ -808,17 +875,19 @@ export default function LeaderboardPage() {
                         key={entry.id}
                         aria-current={mine ? "true" : undefined}
                         className={`relative flex items-center gap-3 px-4 py-3 transition-colors sm:gap-4 sm:px-5 ${
-                          mine ? "bg-[#4F46E5]/[0.05]" : "hover:bg-gray-50"
+                          mine ? "bg-indigo-400/10" : "hover:bg-white/[0.04]"
                         }`}
                       >
-                        {mine && <span className="absolute inset-y-0 left-0 w-0.5 bg-[#4F46E5]" />}
+                        {mine && (
+                          <span className="absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b from-indigo-400 to-cyan-300" />
+                        )}
 
                         <span
-                          className={`${display.className} flex w-10 shrink-0 items-center justify-center text-sm font-bold tabular-nums text-gray-500`}
+                          className={`${display.className} flex w-10 shrink-0 items-center justify-center text-sm font-bold tabular-nums text-slate-400`}
                           title={tied ? "Tied rank" : undefined}
                         >
                           {tied ? (
-                            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+                            <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-xs text-slate-200">
                               T{entry.rank}
                             </span>
                           ) : (
@@ -830,30 +899,30 @@ export default function LeaderboardPage() {
                           <Avatar entry={entry} size="h-9 w-9" />
                           {entry.is_online && (
                             <span
-                              className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500"
+                              className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
                               title="Online"
                             />
                           )}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <p className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                          <p className="flex items-center gap-2 text-sm font-semibold text-white">
                             <span className="truncate">{entry.username}</span>
-                            {mine && (
-                              <span className="shrink-0 rounded-full bg-[#4F46E5]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#4F46E5]">
-                                You
-                              </span>
-                            )}
+                            {mine && <YouBadge />}
                           </p>
-                          <p className="mt-0.5 flex items-center gap-2 text-xs tabular-nums text-gray-400">
+                          <p className="mt-0.5 flex items-center gap-2 text-xs tabular-nums text-slate-500">
                             <span>Level {entry.level}</span>
-                            <span className="h-0.5 w-0.5 rounded-full bg-gray-300" />
+                            <span className="h-0.5 w-0.5 rounded-full bg-slate-600" />
                             <span>{entry.xp.toLocaleString("en-US")} XP</span>
                           </p>
                           {entry.top_score > 0 && (
-                            <div className="mt-2 h-1 w-full max-w-[200px] overflow-hidden rounded-full bg-gray-100">
+                            <div className="mt-2 h-1 w-full max-w-[200px] overflow-hidden rounded-full bg-white/10">
                               <div
-                                className={`h-full rounded-full ${mine ? "bg-[#4F46E5]" : "bg-gray-300"}`}
+                                className={`h-full rounded-full ${
+                                  mine
+                                    ? "bg-gradient-to-r from-indigo-400 to-cyan-300"
+                                    : "bg-slate-500"
+                                }`}
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
@@ -862,7 +931,7 @@ export default function LeaderboardPage() {
 
                         <span
                           className={`${display.className} text-base font-bold tabular-nums ${
-                            entry.top_score > 0 ? "text-gray-900" : "text-gray-300"
+                            entry.top_score > 0 ? "text-white" : "text-slate-600"
                           }`}
                         >
                           {formatScore(entry.top_score)}
@@ -876,6 +945,6 @@ export default function LeaderboardPage() {
           </>
         )}
       </div>
-    </div>
+    </Shell>
   );
 }
