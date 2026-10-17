@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -68,9 +69,7 @@ function range(min: number, max: number): string {
 }
 
 function describeSettings(settings: CustomSettings): string {
-  const ops = OPERATIONS.filter((op) =>
-    settings.operations.includes(op.value)
-  )
+  const ops = OPERATIONS.filter((op) => settings.operations.includes(op.value))
     .map((op) => op.label)
     .join(" ");
 
@@ -129,6 +128,24 @@ function validateSettings(settings: CustomSettings): string | null {
     return "Decimal places must be between 0 and 3.";
   }
 
+  // The first number is always larger than the second, and both are at
+  // least 2, so the first number needs room to be bigger.
+  const smallestSecond = Math.max(2, 10 ** (settings.rightMinDigits - 1));
+  const largestFirst = 10 ** settings.leftMaxDigits - 1;
+
+  if (smallestSecond >= largestFirst) {
+    return "The first number must be able to be larger than the second. Allow more digits for the first number or fewer for the second.";
+  }
+
+  // Division needs the first number to hold at least 2x the divisor
+  if (
+    settings.operations.includes("/") &&
+    smallestSecond * (10 ** settings.decimalPlaces + 1) >
+      largestFirst * 10 ** settings.decimalPlaces
+  ) {
+    return "Division needs a first number at least twice the size of the second. Allow more digits for the first number.";
+  }
+
   return null;
 }
 
@@ -152,8 +169,266 @@ function initials(name: string): string {
 }
 
 /* ------------------------------------------------------------------ */
+/* Three.js background                                                 */
+/* Needs: npm i three && npm i -D @types/three                         */
+/* Loaded lazily inside useEffect so it never runs during SSR.         */
+/* ------------------------------------------------------------------ */
+
+function DuelScene() {
+  const mountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    let disposed = false;
+    let cleanup: () => void = () => {};
+
+    (async () => {
+      const THREE = await import("three");
+      if (disposed || !mount) return;
+
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      mount.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+      camera.position.z = 14;
+
+      const disposables: Array<{ dispose: () => void }> = [];
+
+      /* Central wireframe: two crossing shapes, like a duel */
+      const hero = new THREE.Group();
+      hero.position.set(5.5, 0.5, -3);
+      scene.add(hero);
+
+      const coreGeo = new THREE.IcosahedronGeometry(2.8, 1);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x818cf8,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.28,
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      hero.add(core);
+
+      const innerGeo = new THREE.OctahedronGeometry(1.5, 0);
+      const innerMat = new THREE.MeshBasicMaterial({
+        color: 0x22d3ee,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const inner = new THREE.Mesh(innerGeo, innerMat);
+      hero.add(inner);
+
+      const ringGeo = new THREE.TorusGeometry(4.2, 0.012, 8, 160);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xa78bfa,
+        transparent: true,
+        opacity: 0.45,
+      });
+      const ringA = new THREE.Mesh(ringGeo, ringMat);
+      ringA.rotation.x = Math.PI / 2.4;
+      const ringB = new THREE.Mesh(ringGeo, ringMat);
+      ringB.rotation.y = Math.PI / 2.6;
+      ringB.scale.setScalar(0.82);
+      hero.add(ringA, ringB);
+
+      disposables.push(coreGeo, coreMat, innerGeo, innerMat, ringGeo, ringMat);
+
+      /* Floating math symbols */
+      const symbols = ["+", "\u2212", "\u00d7", "\u00f7", "=", "%", "\u221a", "\u03c0"];
+      const colors = ["#a5b4fc", "#67e8f9", "#c4b5fd", "#f0abfc"];
+      const textures: Array<InstanceType<typeof THREE.CanvasTexture>> = [];
+
+      symbols.forEach((symbol, i) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.font = "600 88px ui-sans-serif, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.shadowColor = colors[i % colors.length];
+        ctx.shadowBlur = 18;
+        ctx.fillText(symbol, 64, 70);
+        textures.push(new THREE.CanvasTexture(canvas));
+      });
+
+      type Floater = {
+        sprite: InstanceType<typeof THREE.Sprite>;
+        baseY: number;
+        speed: number;
+        phase: number;
+        spin: number;
+      };
+      const floaters: Floater[] = [];
+      const spriteMats: Array<InstanceType<typeof THREE.SpriteMaterial>> = [];
+
+      for (let i = 0; i < 22; i++) {
+        const texture = textures[i % textures.length];
+        if (!texture) continue;
+        const mat = new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 0.16 + Math.random() * 0.3,
+          depthWrite: false,
+        });
+        spriteMats.push(mat);
+        const sprite = new THREE.Sprite(mat);
+        const size = 0.9 + Math.random() * 1.5;
+        sprite.scale.set(size, size, 1);
+        sprite.position.set(
+          (Math.random() - 0.5) * 30,
+          (Math.random() - 0.5) * 16,
+          -8 + Math.random() * 11
+        );
+        scene.add(sprite);
+        floaters.push({
+          sprite,
+          baseY: sprite.position.y,
+          speed: 0.15 + Math.random() * 0.35,
+          phase: Math.random() * Math.PI * 2,
+          spin: (Math.random() - 0.5) * 0.4,
+        });
+      }
+
+      /* Star dust */
+      const COUNT = 320;
+      const positions = new Float32Array(COUNT * 3);
+      for (let i = 0; i < COUNT; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 40;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 24;
+        positions[i * 3 + 2] = -12 + Math.random() * 18;
+      }
+      const dustGeo = new THREE.BufferGeometry();
+      dustGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const dustMat = new THREE.PointsMaterial({
+        color: 0xc7d2fe,
+        size: 0.05,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      });
+      const dust = new THREE.Points(dustGeo, dustMat);
+      scene.add(dust);
+      disposables.push(dustGeo, dustMat);
+
+      /* Sizing */
+      const resize = () => {
+        const w = mount.clientWidth || window.innerWidth;
+        const h = mount.clientHeight || window.innerHeight;
+        renderer.setSize(w, h, false);
+        renderer.domElement.style.width = "100%";
+        renderer.domElement.style.height = "100%";
+        camera.aspect = w / h;
+        // On narrow screens, pull the hero shape toward the centre
+        hero.position.x = w < 900 ? 0 : 5.5;
+        hero.position.y = w < 900 ? 4 : 0.5;
+        camera.updateProjectionMatrix();
+      };
+      resize();
+      window.addEventListener("resize", resize);
+
+      /* Mouse parallax */
+      const pointer = { x: 0, y: 0 };
+      const onMove = (event: PointerEvent) => {
+        pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
+        pointer.y = (event.clientY / window.innerHeight - 0.5) * 2;
+      };
+      window.addEventListener("pointermove", onMove, { passive: true });
+
+      /* Loop */
+      const clock = new THREE.Clock();
+      let frame = 0;
+
+      const render = () => {
+        const t = clock.getElapsedTime();
+
+        core.rotation.y = t * 0.12;
+        core.rotation.x = t * 0.05;
+        inner.rotation.y = -t * 0.35;
+        inner.rotation.z = t * 0.2;
+        ringA.rotation.z = t * 0.1;
+        ringB.rotation.x = t * 0.12;
+        hero.position.y += Math.sin(t * 0.6) * 0.0015;
+
+        floaters.forEach((f) => {
+          f.sprite.position.y = f.baseY + Math.sin(t * f.speed + f.phase) * 0.8;
+          f.sprite.material.rotation += f.spin * 0.002;
+        });
+
+        dust.rotation.y = t * 0.008;
+
+        camera.position.x += (pointer.x * 0.9 - camera.position.x) * 0.04;
+        camera.position.y += (-pointer.y * 0.6 - camera.position.y) * 0.04;
+        camera.lookAt(0, 0, 0);
+
+        renderer.render(scene, camera);
+      };
+
+      const loop = () => {
+        render();
+        frame = requestAnimationFrame(loop);
+      };
+
+      if (reduceMotion) {
+        render(); // one still frame
+      } else {
+        loop();
+      }
+
+      cleanup = () => {
+        cancelAnimationFrame(frame);
+        window.removeEventListener("resize", resize);
+        window.removeEventListener("pointermove", onMove);
+        disposables.forEach((d) => d.dispose());
+        spriteMats.forEach((m) => m.dispose());
+        textures.forEach((tx) => tx.dispose());
+        renderer.dispose();
+        if (renderer.domElement.parentNode === mount) {
+          mount.removeChild(renderer.domElement);
+        }
+      };
+    })();
+
+    return () => {
+      disposed = true;
+      cleanup();
+    };
+  }, []);
+
+  return (
+    <div
+      ref={mountRef}
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0"
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Small presentational pieces                                         */
 /* ------------------------------------------------------------------ */
+
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
+const glass =
+  "rounded-2xl bg-slate-900/60 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
 
 function Spinner({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -198,18 +473,20 @@ function Avatar({
         <img
           src={url}
           alt=""
-          className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200"
+          className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
         />
       ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700 ring-1 ring-indigo-200">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-semibold text-white ring-2 ring-white/10">
           {initials(name)}
         </div>
       )}
 
       {online !== undefined && (
         <span
-          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
-            online ? "bg-emerald-500" : "bg-slate-300"
+          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
+            online
+              ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              : "bg-slate-600"
           }`}
           aria-hidden="true"
         />
@@ -223,35 +500,26 @@ function NumberField({
   value,
   min,
   max,
-  suffix,
   onChange,
 }: {
   label: string;
   value: number;
   min: number;
   max: number;
-  suffix?: string;
   onChange: (value: number) => void;
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-600">{label}</span>
-      <div className="relative mt-1">
-        <input
-          type="number"
-          inputMode="numeric"
-          min={min}
-          max={max}
-          value={Number.isNaN(value) ? "" : value}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-        />
-        {suffix && (
-          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-xs text-slate-400">
-            {suffix}
-          </span>
-        )}
-      </div>
+      <span className="text-xs font-medium text-slate-400">{label}</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={Number.isNaN(value) ? "" : value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="mt-1.5 w-full rounded-lg border-0 bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-inset ring-white/10 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+      />
     </label>
   );
 }
@@ -262,32 +530,27 @@ function Banner({
   onDismiss,
 }: {
   tone: "error" | "success";
-  children: React.ReactNode;
+  children: ReactNode;
   onDismiss: () => void;
 }) {
   const styles =
     tone === "error"
-      ? "border-red-200 bg-red-50 text-red-800"
-      : "border-emerald-200 bg-emerald-50 text-emerald-800";
+      ? "bg-red-500/10 text-red-200 ring-red-400/30"
+      : "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30";
 
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${styles}`}
+      className={`flex items-start justify-between gap-3 rounded-xl px-4 py-3 text-sm ring-1 backdrop-blur ${styles}`}
     >
       <p>{children}</p>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss message"
-        className="-m-1 rounded p-1 opacity-60 transition hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        className={`-m-1 rounded p-1 opacity-60 transition hover:opacity-100 ${focusRing}`}
       >
-        <svg
-          viewBox="0 0 20 20"
-          className="h-4 w-4"
-          fill="currentColor"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
           <path d="M5.3 5.3a1 1 0 011.4 0L10 8.6l3.3-3.3a1 1 0 111.4 1.4L11.4 10l3.3 3.3a1 1 0 01-1.4 1.4L10 11.4l-3.3 3.3a1 1 0 01-1.4-1.4L8.6 10 5.3 6.7a1 1 0 010-1.4z" />
         </svg>
       </button>
@@ -297,14 +560,14 @@ function Banner({
 
 function SkeletonRows({ count }: { count: number }) {
   return (
-    <div className="animate-pulse space-y-4" aria-hidden="true">
+    <div className="animate-pulse space-y-5" aria-hidden="true">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
-          <div className="h-4 w-16 rounded bg-slate-200" />
+        <div key={i} className="flex items-center gap-5">
+          <div className="h-4 w-16 rounded bg-white/10" />
           <div className="flex gap-2">
-            <div className="h-9 w-16 rounded-lg bg-slate-100" />
-            <div className="h-9 w-16 rounded-lg bg-slate-100" />
-            <div className="h-9 w-16 rounded-lg bg-slate-100" />
+            {[0, 1, 2, 3].map((n) => (
+              <div key={n} className="h-9 w-16 rounded-lg bg-white/5" />
+            ))}
           </div>
         </div>
       ))}
@@ -352,6 +615,69 @@ export default function DuelLobbyPage() {
     [router]
   );
 
+  /* ------------------------------ derived ------------------------------- */
+
+  const levels = useMemo(() => {
+    const byLevel = new Map<number, GameConfiguration[]>();
+
+    configurations.forEach((configuration) => {
+      const list = byLevel.get(configuration.level) ?? [];
+      list.push(configuration);
+      byLevel.set(configuration.level, list);
+    });
+
+    return Array.from(byLevel.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([level, items]) => ({
+        level,
+        items: [...items].sort((a, b) => a.timer - b.timer),
+      }));
+  }, [configurations]);
+
+  const selectedConfiguration = configurations.find(
+    (configuration) => String(configuration.id) === selectedConfigurationId
+  );
+
+  const isCustomSelected = selectedConfiguration
+    ? isCustomConfiguration(selectedConfiguration)
+    : false;
+
+  const customError = isCustomSelected
+    ? validateSettings(customSettings)
+    : null;
+
+  const selectedLabel = !selectedConfiguration
+    ? ""
+    : isCustomSelected
+      ? "Custom rules"
+      : `Level ${selectedConfiguration.level}, ${formatTimer(
+          selectedConfiguration.timer
+        )}`;
+
+  const sortedFriends = useMemo(
+    () =>
+      [...friends].sort((a, b) => {
+        if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+        return (a.username || "").localeCompare(b.username || "");
+      }),
+    [friends]
+  );
+
+  const onlineCount = friends.filter((friend) => friend.is_online).length;
+
+  const toggleOperation = (operation: string) => {
+    setCustomSettings((current) => ({
+      ...current,
+      operations: current.operations.includes(operation)
+        ? current.operations.filter((op) => op !== operation)
+        : [...current.operations, operation],
+    }));
+  };
+
+  const updateCustom = (patch: Partial<CustomSettings>) => {
+    setCustomSettings((current) => ({ ...current, ...patch }));
+  };
+
   /* ---------------------------- data loading ---------------------------- */
 
   const loadLobby = useCallback(async () => {
@@ -380,18 +706,14 @@ export default function DuelLobbyPage() {
           : []
       );
 
-      setSelectedConfigurationId((current) => {
-        if (
-          current &&
-          configResponse.some(
-            (configuration) => String(configuration.id) === current
-          )
-        ) {
-          return current;
-        }
-
-        return "";
-      });
+      setSelectedConfigurationId((current) =>
+        current &&
+        configResponse.some(
+          (configuration) => String(configuration.id) === current
+        )
+          ? current
+          : ""
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load the duel lobby."
@@ -405,8 +727,7 @@ export default function DuelLobbyPage() {
     void loadLobby();
   }, [loadLobby]);
 
-  // Keep friends' online status and incoming challenges fresh without a
-  // manual refresh.
+  // Keep friends' online status and incoming challenges fresh.
   useEffect(() => {
     const interval = window.setInterval(async () => {
       try {
@@ -449,8 +770,7 @@ export default function DuelLobbyPage() {
     return () => window.clearInterval(interval);
   }, [findingOpponent]);
 
-  // After sending a challenge, wait for the friend to accept and enter
-  // the duel as soon as it exists.
+  // After sending a challenge, wait for the friend to accept.
   useEffect(() => {
     if (!sentChallenge) return;
 
@@ -647,83 +967,25 @@ export default function DuelLobbyPage() {
     }
   };
 
-  /* ------------------------------ derived ------------------------------- */
-
-  const levels = useMemo(() => {
-    const byLevel = new Map<number, GameConfiguration[]>();
-
-    configurations.forEach((configuration) => {
-      const list = byLevel.get(configuration.level) ?? [];
-      list.push(configuration);
-      byLevel.set(configuration.level, list);
-    });
-
-    return Array.from(byLevel.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([level, items]) => ({
-        level,
-        items: [...items].sort((a, b) => a.timer - b.timer),
-      }));
-  }, [configurations]);
-
-  const selectedConfiguration = configurations.find(
-    (configuration) => String(configuration.id) === selectedConfigurationId
-  );
-
-  const isCustomSelected = selectedConfiguration
-    ? isCustomConfiguration(selectedConfiguration)
-    : false;
-
-  const customError = isCustomSelected
-    ? validateSettings(customSettings)
-    : null;
-
-  const selectedLabel = !selectedConfiguration
-    ? ""
-    : isCustomSelected
-      ? "Custom rules"
-      : `Level ${selectedConfiguration.level}, ${formatTimer(
-          selectedConfiguration.timer
-        )}`;
-
-  const toggleOperation = (operation: string) => {
-    setCustomSettings((current) => ({
-      ...current,
-      operations: current.operations.includes(operation)
-        ? current.operations.filter((op) => op !== operation)
-        : [...current.operations, operation],
-    }));
-  };
-
-  const updateCustom = (patch: Partial<CustomSettings>) => {
-    setCustomSettings((current) => ({ ...current, ...patch }));
-  };
-
-  const sortedFriends = useMemo(
-    () =>
-      [...friends].sort((a, b) => {
-        if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
-        return (a.username || "").localeCompare(b.username || "");
-      }),
-    [friends]
-  );
-
-  const onlineCount = friends.filter((friend) => friend.is_online).length;
-
-  const focusRing =
-    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600";
-
   /* ------------------------------- render ------------------------------- */
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Duel lobby</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-            Race an opponent through the same questions. The first correct
-            answer takes the point, and the highest score when time runs out
-            wins.
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] px-4 py-12 text-slate-100 sm:px-6">
+      {/* Ambient colour behind the 3D scene */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_30%,rgba(99,102,241,0.22),transparent),radial-gradient(45%_40%_at_10%_90%,rgba(34,211,238,0.12),transparent)]"
+      />
+      <DuelScene />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <header className="mb-10 max-w-2xl">
+          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+            Duel lobby
+          </h1>
+          <p className="mt-3 text-base leading-7 text-slate-400">
+            Same questions, one race. The first correct answer scores, and the
+            highest score when time runs out wins.
           </p>
         </header>
 
@@ -746,32 +1008,36 @@ export default function DuelLobbyPage() {
           {/* -------------------------- Quick match -------------------------- */}
           <section
             aria-labelledby="quick-match-heading"
-            className="self-start rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 lg:col-span-3"
+            className={`self-start overflow-hidden lg:col-span-3 ${glass}`}
           >
-            <div className="border-b border-slate-100 px-6 py-5">
-              <h2 id="quick-match-heading" className="text-lg font-semibold">
+            <div className="px-6 pb-5 pt-6">
+              <h2 id="quick-match-heading" className="text-xl font-semibold text-white">
                 Quick match
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                We pair you with an online player close to your level.
+              <p className="mt-1 text-sm text-slate-400">
+                We pair you with an online player at your level.
               </p>
             </div>
 
             {findingOpponent ? (
-              <div className="flex flex-col items-center px-6 py-14 text-center">
-                <div className="relative flex h-20 w-20 items-center justify-center">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-indigo-200 opacity-60 motion-reduce:animate-none" />
-                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600 text-white">
+              <div className="flex flex-col items-center border-t border-white/10 px-6 py-14 text-center">
+                <div className="relative flex h-24 w-24 items-center justify-center">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-indigo-500/30 motion-reduce:animate-none" />
+                  <span className="absolute inset-2 rounded-full ring-1 ring-cyan-300/40" />
+                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-400 text-white shadow-[0_0_30px_rgba(99,102,241,0.6)]">
                     <Spinner className="h-7 w-7" />
                   </span>
                 </div>
 
-                <p className="mt-6 text-lg font-semibold">
+                <p className="mt-7 text-lg font-semibold text-white">
                   Looking for an opponent
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedLabel || "Searching"} ·{" "}
-                  {formatElapsed(searchSeconds)}
+                <p className="mt-1 text-sm text-slate-400">
+                  {selectedLabel || "Searching"}
+                  <span className="mx-2 text-slate-600">|</span>
+                  <span className="tabular-nums">
+                    {formatElapsed(searchSeconds)}
+                  </span>
                 </p>
 
                 {isCustomSelected && (
@@ -784,23 +1050,23 @@ export default function DuelLobbyPage() {
                 <button
                   type="button"
                   onClick={handleLeaveQueue}
-                  className={`mt-8 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 ${focusRing}`}
+                  className={`mt-8 rounded-lg bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 ${focusRing}`}
                 >
                   Cancel search
                 </button>
               </div>
             ) : (
               <>
-                <div className="px-6 py-5">
+                <div className="border-t border-white/10 px-6 py-5">
                   {loading ? (
                     <SkeletonRows count={4} />
                   ) : levels.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      No game settings are available right now. Try refreshing
-                      the page in a moment.
+                    <p className="text-sm text-slate-400">
+                      No game settings are available right now. Try again in a
+                      moment.
                     </p>
                   ) : (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-white/5">
                       {levels.map(({ level, items }) => {
                         const customGroup = items.some(isCustomConfiguration);
                         const groupName = customGroup
@@ -808,41 +1074,43 @@ export default function DuelLobbyPage() {
                           : `Level ${level}`;
 
                         return (
-                        <div
-                          key={level}
-                          role="group"
-                          aria-label={`${groupName} options`}
-                          className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-6"
-                        >
-                          <p className="w-20 shrink-0 text-sm font-semibold text-slate-900">
-                            {groupName}
-                          </p>
+                          <div
+                            key={level}
+                            role="group"
+                            aria-label={`${groupName} options`}
+                            className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-6"
+                          >
+                            <p className="w-20 shrink-0 text-sm font-semibold text-slate-200">
+                              {groupName}
+                            </p>
 
-                          <div className="flex flex-wrap gap-2">
-                            {items.map((configuration) => {
-                              const id = String(configuration.id);
-                              const selected = selectedConfigurationId === id;
+                            <div className="flex flex-wrap gap-2">
+                              {items.map((configuration) => {
+                                const id = String(configuration.id);
+                                const selected = selectedConfigurationId === id;
 
-                              return (
-                                <button
-                                  key={id}
-                                  type="button"
-                                  onClick={() => setSelectedConfigurationId(id)}
-                                  aria-pressed={selected}
-                                  className={`min-w-[4.5rem] rounded-lg px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
-                                    selected
-                                      ? "bg-indigo-600 text-white shadow-sm"
-                                      : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300"
-                                  }`}
-                                >
-                                  {isCustomConfiguration(configuration)
-                                    ? "Set your own rules"
-                                    : formatTimer(configuration.timer)}
-                                </button>
-                              );
-                            })}
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedConfigurationId(id)
+                                    }
+                                    aria-pressed={selected}
+                                    className={`min-w-[4.5rem] rounded-lg px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
+                                      selected
+                                        ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.5)]"
+                                        : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10 hover:text-white"
+                                    }`}
+                                  >
+                                    {isCustomConfiguration(configuration)
+                                      ? "Set your own rules"
+                                      : formatTimer(configuration.timer)}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
                         );
                       })}
                     </div>
@@ -850,14 +1118,16 @@ export default function DuelLobbyPage() {
                 </div>
 
                 {isCustomSelected && (
-                  <div className="border-t border-slate-100 px-6 py-5">
-                    <h3 className="text-sm font-semibold">Custom rules</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Quick match pairs you with a player who chose exactly the
-                      same rules. A challenge uses your rules.
+                  <div className="border-t border-white/10 bg-white/[0.02] px-6 py-5">
+                    <h3 className="text-sm font-semibold text-white">
+                      Custom rules
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Quick match pairs you with a player who chose the same
+                      rules. Challenges use your rules.
                     </p>
 
-                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div className="mt-5 grid grid-cols-2 gap-4">
                       <NumberField
                         label="Time limit (seconds)"
                         value={customSettings.timer}
@@ -877,7 +1147,7 @@ export default function DuelLobbyPage() {
                     </div>
 
                     <fieldset className="mt-5">
-                      <legend className="text-xs font-medium text-slate-600">
+                      <legend className="text-xs font-medium text-slate-400">
                         Operations
                       </legend>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -896,8 +1166,8 @@ export default function DuelLobbyPage() {
                               title={operation.name}
                               className={`h-10 w-12 rounded-lg text-lg font-medium transition ${focusRing} ${
                                 on
-                                  ? "bg-indigo-600 text-white shadow-sm"
-                                  : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+                                  ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.45)]"
+                                  : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10"
                               }`}
                             >
                               {operation.label}
@@ -909,7 +1179,7 @@ export default function DuelLobbyPage() {
 
                     <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                       <NumberField
-                        label="First number: min digits"
+                        label="First: min digits"
                         value={customSettings.leftMinDigits}
                         min={1}
                         max={6}
@@ -918,7 +1188,7 @@ export default function DuelLobbyPage() {
                         }
                       />
                       <NumberField
-                        label="First number: max digits"
+                        label="First: max digits"
                         value={customSettings.leftMaxDigits}
                         min={1}
                         max={6}
@@ -927,7 +1197,7 @@ export default function DuelLobbyPage() {
                         }
                       />
                       <NumberField
-                        label="Second number: min digits"
+                        label="Second: min digits"
                         value={customSettings.rightMinDigits}
                         min={1}
                         max={6}
@@ -936,7 +1206,7 @@ export default function DuelLobbyPage() {
                         }
                       />
                       <NumberField
-                        label="Second number: max digits"
+                        label="Second: max digits"
                         value={customSettings.rightMaxDigits}
                         min={1}
                         max={6}
@@ -946,51 +1216,47 @@ export default function DuelLobbyPage() {
                       />
                     </div>
 
-                    {(customSettings.decimalPlaces > 0 ||
-                      customSettings.operations.includes("/")) && (
-                      <p className="mt-4 text-xs leading-5 text-slate-500">
-                        With decimals, only the first number has decimal places
-                        in multiplication and division. Division always has an
-                        exact answer.
-                      </p>
-                    )}
+                    <p className="mt-4 text-xs leading-5 text-slate-500">
+                      The first number is always larger than the second, and
+                      both are at least 2.
+                      {(customSettings.decimalPlaces > 0 ||
+                        customSettings.operations.includes("/")) &&
+                        " With decimals, only the first number has decimal places in multiplication and division. Division always has an exact answer."}
+                    </p>
 
                     {customError && (
-                      <p role="alert" className="mt-4 text-sm text-red-600">
+                      <p role="alert" className="mt-4 text-sm text-red-300">
                         {customError}
                       </p>
                     )}
                   </div>
                 )}
 
-                <div className="flex flex-col gap-4 rounded-b-2xl border-t border-slate-100 bg-slate-50/60 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-slate-600">
+                <div className="flex flex-col gap-4 border-t border-white/10 bg-black/20 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 text-sm text-slate-400">
                     {selectedConfiguration ? (
                       <>
-                        Selected:{" "}
-                        <span className="font-semibold text-slate-900">
+                        <p className="font-semibold text-white">
                           {selectedLabel}
-                        </span>
+                        </p>
                         {isCustomSelected && !customError && (
-                          <span className="block text-xs text-slate-500">
+                          <p className="mt-0.5 text-xs text-slate-500">
                             {describeSettings(customSettings)}
-                          </span>
+                          </p>
                         )}
                       </>
                     ) : (
-                      "Pick a level and a time limit to start."
+                      <p>Pick a level and time limit to start.</p>
                     )}
-                  </p>
+                  </div>
 
                   <button
                     type="button"
                     onClick={handleFindOpponent}
                     disabled={
-                      loading ||
-                      !selectedConfigurationId ||
-                      Boolean(customError)
+                      loading || !selectedConfigurationId || Boolean(customError)
                     }
-                    className={`rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 ${focusRing}`}
+                    className={`shrink-0 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-7 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${focusRing}`}
                   >
                     Find opponent
                   </button>
@@ -1004,30 +1270,30 @@ export default function DuelLobbyPage() {
             {/* Incoming challenges */}
             <section
               aria-labelledby="incoming-heading"
-              className={`rounded-2xl bg-white shadow-sm ring-1 ${
+              className={`${glass} ${
                 incomingChallenges.length > 0
-                  ? "ring-indigo-300"
-                  : "ring-slate-200"
+                  ? "!ring-indigo-400/60 shadow-[0_0_40px_-8px_rgba(99,102,241,0.5)]"
+                  : ""
               }`}
             >
               <div className="flex items-center justify-between px-6 py-5">
-                <h2 id="incoming-heading" className="text-lg font-semibold">
+                <h2 id="incoming-heading" className="text-lg font-semibold text-white">
                   Challenges for you
                 </h2>
 
                 {incomingChallenges.length > 0 && (
-                  <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                  <span className="rounded-full bg-indigo-500 px-2.5 py-0.5 text-xs font-semibold text-white">
                     {incomingChallenges.length}
                   </span>
                 )}
               </div>
 
               {incomingChallenges.length === 0 ? (
-                <p className="border-t border-slate-100 px-6 py-5 text-sm text-slate-500">
-                  Nothing waiting. New challenges show up here automatically.
+                <p className="border-t border-white/10 px-6 py-5 text-sm text-slate-500">
+                  Nothing waiting. New challenges appear here automatically.
                 </p>
               ) : (
-                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                <ul className="divide-y divide-white/5 border-t border-white/10">
                   {incomingChallenges.map((challenge) => {
                     const challengeId = String(challenge.id);
                     const name = challenge.challenger_username || "A friend";
@@ -1038,17 +1304,17 @@ export default function DuelLobbyPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={name} src={challenge.challenger_avatar} />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
+                            <p className="truncate text-sm font-semibold text-white">
                               {name}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-400">
                               Level {challenge.challenger_level ?? "-"} player
                             </p>
                           </div>
                         </div>
 
                         {challenge.custom_settings && (
-                          <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                          <p className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs leading-5 text-slate-300">
                             Custom rules:{" "}
                             {describeSettings(challenge.custom_settings)}
                           </p>
@@ -1061,7 +1327,7 @@ export default function DuelLobbyPage() {
                               handleRespondToChallenge(challengeId, true)
                             }
                             disabled={busy}
-                            className={`flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 ${focusRing}`}
+                            className={`flex-1 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50 ${focusRing}`}
                           >
                             {respondingChallengeId === challengeId
                               ? "Joining..."
@@ -1073,7 +1339,7 @@ export default function DuelLobbyPage() {
                               handleRespondToChallenge(challengeId, false)
                             }
                             disabled={busy}
-                            className={`flex-1 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 disabled:opacity-50 ${focusRing}`}
+                            className={`flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 disabled:opacity-50 ${focusRing}`}
                           >
                             Decline
                           </button>
@@ -1088,37 +1354,32 @@ export default function DuelLobbyPage() {
             {/* Friends */}
             <section
               aria-labelledby="friends-heading"
-              className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
+              className={glass}
             >
-              <div className="flex items-center justify-between px-6 py-5">
-                <div>
-                  <h2 id="friends-heading" className="text-lg font-semibold">
-                    Challenge a friend
-                  </h2>
-                  {!loading && friends.length > 0 && (
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {onlineCount} of {friends.length} online
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void loadLobby()}
-                  disabled={loading}
-                  className={`rounded-md px-2 py-1 text-sm font-medium text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-50 ${focusRing}`}
-                >
-                  Refresh
-                </button>
+              <div className="px-6 py-5">
+                <h2 id="friends-heading" className="text-lg font-semibold text-white">
+                  Challenge a friend
+                </h2>
+                {!loading && friends.length > 0 && (
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        onlineCount > 0 ? "bg-emerald-400" : "bg-slate-600"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    {onlineCount} of {friends.length} online
+                  </p>
+                )}
               </div>
 
               {sentChallenge && (
                 <div
                   role="status"
-                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-900 ring-1 ring-indigo-200"
+                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-xl bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100 ring-1 ring-indigo-400/30"
                 >
                   <div className="flex items-center gap-3">
-                    <Spinner className="h-4 w-4 shrink-0 text-indigo-600" />
+                    <Spinner className="h-4 w-4 shrink-0 text-cyan-300" />
                     <p>
                       Waiting for{" "}
                       <span className="font-semibold">
@@ -1131,7 +1392,7 @@ export default function DuelLobbyPage() {
                   <button
                     type="button"
                     onClick={handleCancelChallenge}
-                    className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 ${focusRing}`}
+                    className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-cyan-200 transition hover:bg-white/10 ${focusRing}`}
                   >
                     Cancel
                   </button>
@@ -1140,23 +1401,22 @@ export default function DuelLobbyPage() {
 
               {loading ? (
                 <div
-                  className="animate-pulse space-y-4 border-t border-slate-100 px-6 py-5"
+                  className="animate-pulse space-y-4 border-t border-white/10 px-6 py-5"
                   aria-hidden="true"
                 >
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-slate-200" />
-                      <div className="h-4 w-28 rounded bg-slate-200" />
+                      <div className="h-10 w-10 rounded-full bg-white/10" />
+                      <div className="h-4 w-28 rounded bg-white/10" />
                     </div>
                   ))}
                 </div>
               ) : friends.length === 0 ? (
-                <p className="border-t border-slate-100 px-6 py-5 text-sm text-slate-500">
-                  You have no friends yet. Add friends to challenge them to a
-                  duel.
+                <p className="border-t border-white/10 px-6 py-5 text-sm text-slate-500">
+                  No friends yet. Add friends to challenge them to a duel.
                 </p>
               ) : (
-                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                <ul className="divide-y divide-white/5 border-t border-white/10">
                   {sortedFriends.map((friend) => {
                     const friendId = String(friend.id);
                     const name = friend.username || "Friend";
@@ -1181,14 +1441,18 @@ export default function DuelLobbyPage() {
                             online={friend.is_online}
                           />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">
+                            <p
+                              className={`truncate text-sm font-semibold ${
+                                friend.is_online ? "text-white" : "text-slate-400"
+                              }`}
+                            >
                               {name}
                             </p>
                             <p
                               className={`text-xs ${
                                 friend.is_online
-                                  ? "text-emerald-600"
-                                  : "text-slate-400"
+                                  ? "text-emerald-400"
+                                  : "text-slate-500"
                               }`}
                             >
                               {friend.is_online ? "Online" : "Offline"}
@@ -1209,8 +1473,8 @@ export default function DuelLobbyPage() {
                           }
                           className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${focusRing} ${
                             disabled
-                              ? "bg-slate-100 text-slate-400"
-                              : "bg-indigo-600 text-white hover:bg-indigo-700"
+                              ? "bg-white/5 text-slate-500"
+                              : "bg-gradient-to-br from-indigo-500 to-violet-600 text-white hover:brightness-110"
                           }`}
                         >
                           {sending ? "Sending..." : "Challenge"}
@@ -1220,16 +1484,6 @@ export default function DuelLobbyPage() {
                   })}
                 </ul>
               )}
-
-              {!loading &&
-                friends.length > 0 &&
-                !selectedConfigurationId &&
-                onlineCount > 0 && (
-                  <p className="border-t border-slate-100 px-6 py-3 text-xs text-slate-500">
-                    Choose a level and time limit in Quick match to enable
-                    challenges.
-                  </p>
-                )}
             </section>
           </div>
         </div>
