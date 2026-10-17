@@ -121,14 +121,16 @@ export default function Navbar() {
           >
             
 
-  <Image
-    src="/logo.png"
-    alt="EigenX logo"
-    width={32}
-    height={32}
-    priority
-    className="h-8 w-8 rounded-lg object-contain"
-  />
+ 
+<Image
+  src="/logo.png"
+  alt="EigenX"
+  width={32}
+  height={32}
+  priority
+  className="h-8 w-8 rounded-lg object-contain"
+/>
+
  
 
             <span className="text-[15px] font-semibold tracking-tight text-white">
