@@ -15,7 +15,7 @@ import {
   resolveAvatarUrl,
   respondToChallenge,
 } from "../../lib/api";
-import type { GameConfiguration } from "../../lib/api";
+import type { CustomSettings, GameConfiguration } from "../../lib/api";
 import type { Challenge, Duel } from "../../types/duel";
 
 interface Friend {
@@ -32,7 +32,105 @@ interface SentChallenge {
 
 type IncomingChallenge = Challenge & {
   challenger_avatar?: string | null;
+  custom_settings?: CustomSettings | null;
 };
+
+/* ------------------------------------------------------------------ */
+/* Custom rules                                                        */
+/* ------------------------------------------------------------------ */
+
+// The configuration with this level (or flagged is_custom) lets players
+// set their own rules instead of using fixed ones.
+const CUSTOM_LEVEL = 4;
+
+const isCustomConfiguration = (configuration: GameConfiguration): boolean =>
+  Boolean(configuration.is_custom) || configuration.level === CUSTOM_LEVEL;
+
+const DEFAULT_CUSTOM_SETTINGS: CustomSettings = {
+  timer: 60,
+  operations: ["+", "-"],
+  leftMinDigits: 1,
+  leftMaxDigits: 2,
+  rightMinDigits: 1,
+  rightMaxDigits: 2,
+  decimalPlaces: 0,
+};
+
+const OPERATIONS = [
+  { value: "+", label: "+", name: "Addition" },
+  { value: "-", label: "\u2212", name: "Subtraction" },
+  { value: "*", label: "\u00d7", name: "Multiplication" },
+  { value: "/", label: "\u00f7", name: "Division" },
+];
+
+function range(min: number, max: number): string {
+  return min === max ? String(min) : `${min}-${max}`;
+}
+
+function describeSettings(settings: CustomSettings): string {
+  const ops = OPERATIONS.filter((op) =>
+    settings.operations.includes(op.value)
+  )
+    .map((op) => op.label)
+    .join(" ");
+
+  const parts = [
+    formatTimer(settings.timer),
+    ops,
+    `${range(settings.leftMinDigits, settings.leftMaxDigits)} and ${range(
+      settings.rightMinDigits,
+      settings.rightMaxDigits
+    )} digits`,
+  ];
+
+  if (settings.decimalPlaces > 0) {
+    parts.push(
+      `${settings.decimalPlaces} decimal${settings.decimalPlaces > 1 ? "s" : ""}`
+    );
+  }
+
+  return parts.join(", ");
+}
+
+function validateSettings(settings: CustomSettings): string | null {
+  const isInt = (n: number) => Number.isInteger(n);
+
+  if (!isInt(settings.timer) || settings.timer < 10 || settings.timer > 600) {
+    return "Time limit must be between 10 and 600 seconds.";
+  }
+
+  if (settings.operations.length === 0) {
+    return "Choose at least one operation.";
+  }
+
+  const digits = [
+    settings.leftMinDigits,
+    settings.leftMaxDigits,
+    settings.rightMinDigits,
+    settings.rightMaxDigits,
+  ];
+
+  if (!digits.every((d) => isInt(d) && d >= 1 && d <= 6)) {
+    return "Digits must be between 1 and 6.";
+  }
+
+  if (
+    settings.leftMinDigits > settings.leftMaxDigits ||
+    settings.rightMinDigits > settings.rightMaxDigits
+  ) {
+    return "The minimum digits can't be larger than the maximum.";
+  }
+
+  if (
+    !isInt(settings.decimalPlaces) ||
+    settings.decimalPlaces < 0 ||
+    settings.decimalPlaces > 3
+  ) {
+    return "Decimal places must be between 0 and 3.";
+  }
+
+  return null;
+}
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -120,6 +218,44 @@ function Avatar({
   );
 }
 
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  suffix,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  suffix?: string;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-600">{label}</span>
+      <div className="relative mt-1">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          value={Number.isNaN(value) ? "" : value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          className="w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute inset-y-0 right-8 flex items-center text-xs text-slate-400">
+            {suffix}
+          </span>
+        )}
+      </div>
+    </label>
+  );
+}
+
 function Banner({
   tone,
   children,
@@ -203,6 +339,9 @@ export default function DuelLobbyPage() {
   );
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [customSettings, setCustomSettings] = useState<CustomSettings>(
+    DEFAULT_CUSTOM_SETTINGS
+  );
 
   const findingRef = useRef(false);
 
@@ -351,6 +490,11 @@ export default function DuelLobbyPage() {
       return;
     }
 
+    if (customError) {
+      setError(customError);
+      return;
+    }
+
     if (findingRef.current) return;
 
     findingRef.current = true;
@@ -359,7 +503,10 @@ export default function DuelLobbyPage() {
     setMessage("");
 
     try {
-      const result = await joinDuel(configurationId);
+      const result = await joinDuel(
+        configurationId,
+        isCustomSelected ? customSettings : null
+      );
 
       if (result.matched && result.duel) {
         findingRef.current = false;
@@ -419,12 +566,21 @@ export default function DuelLobbyPage() {
       return;
     }
 
+    if (customError) {
+      setError(customError);
+      return;
+    }
+
     setChallengingFriendId(normalizedFriendId);
     setError("");
     setMessage("");
 
     try {
-      const result = await challengeFriend(normalizedFriendId, configurationId);
+      const result = await challengeFriend(
+        normalizedFriendId,
+        configurationId,
+        isCustomSelected ? customSettings : null
+      );
 
       const challengeId = (
         result as unknown as { challenge?: { id?: string | number } }
@@ -514,6 +670,35 @@ export default function DuelLobbyPage() {
     (configuration) => String(configuration.id) === selectedConfigurationId
   );
 
+  const isCustomSelected = selectedConfiguration
+    ? isCustomConfiguration(selectedConfiguration)
+    : false;
+
+  const customError = isCustomSelected
+    ? validateSettings(customSettings)
+    : null;
+
+  const selectedLabel = !selectedConfiguration
+    ? ""
+    : isCustomSelected
+      ? "Custom rules"
+      : `Level ${selectedConfiguration.level}, ${formatTimer(
+          selectedConfiguration.timer
+        )}`;
+
+  const toggleOperation = (operation: string) => {
+    setCustomSettings((current) => ({
+      ...current,
+      operations: current.operations.includes(operation)
+        ? current.operations.filter((op) => op !== operation)
+        : [...current.operations, operation],
+    }));
+  };
+
+  const updateCustom = (patch: Partial<CustomSettings>) => {
+    setCustomSettings((current) => ({ ...current, ...patch }));
+  };
+
   const sortedFriends = useMemo(
     () =>
       [...friends].sort((a, b) => {
@@ -585,13 +770,16 @@ export default function DuelLobbyPage() {
                   Looking for an opponent
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  {selectedConfiguration
-                    ? `Level ${selectedConfiguration.level}, ${formatTimer(
-                        selectedConfiguration.timer
-                      )}`
-                    : "Searching"}{" "}
-                  · {formatElapsed(searchSeconds)}
+                  {selectedLabel || "Searching"} ·{" "}
+                  {formatElapsed(searchSeconds)}
                 </p>
+
+                {isCustomSelected && (
+                  <p className="mt-3 max-w-sm text-xs leading-5 text-slate-500">
+                    {describeSettings(customSettings)}. You will be paired with
+                    a player who picked the same rules.
+                  </p>
+                )}
 
                 <button
                   type="button"
@@ -613,15 +801,21 @@ export default function DuelLobbyPage() {
                     </p>
                   ) : (
                     <div className="divide-y divide-slate-100">
-                      {levels.map(({ level, items }) => (
+                      {levels.map(({ level, items }) => {
+                        const customGroup = items.some(isCustomConfiguration);
+                        const groupName = customGroup
+                          ? "Custom"
+                          : `Level ${level}`;
+
+                        return (
                         <div
                           key={level}
                           role="group"
-                          aria-label={`Level ${level} time limits`}
+                          aria-label={`${groupName} options`}
                           className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-6"
                         >
                           <p className="w-20 shrink-0 text-sm font-semibold text-slate-900">
-                            Level {level}
+                            {groupName}
                           </p>
 
                           <div className="flex flex-wrap gap-2">
@@ -641,16 +835,133 @@ export default function DuelLobbyPage() {
                                       : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50 hover:ring-slate-300"
                                   }`}
                                 >
-                                  {formatTimer(configuration.timer)}
+                                  {isCustomConfiguration(configuration)
+                                    ? "Set your own rules"
+                                    : formatTimer(configuration.timer)}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
+
+                {isCustomSelected && (
+                  <div className="border-t border-slate-100 px-6 py-5">
+                    <h3 className="text-sm font-semibold">Custom rules</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Quick match pairs you with a player who chose exactly the
+                      same rules. A challenge uses your rules.
+                    </p>
+
+                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      <NumberField
+                        label="Time limit (seconds)"
+                        value={customSettings.timer}
+                        min={10}
+                        max={600}
+                        onChange={(timer) => updateCustom({ timer })}
+                      />
+                      <NumberField
+                        label="Decimal places"
+                        value={customSettings.decimalPlaces}
+                        min={0}
+                        max={3}
+                        onChange={(decimalPlaces) =>
+                          updateCustom({ decimalPlaces })
+                        }
+                      />
+                    </div>
+
+                    <fieldset className="mt-5">
+                      <legend className="text-xs font-medium text-slate-600">
+                        Operations
+                      </legend>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {OPERATIONS.map((operation) => {
+                          const on = customSettings.operations.includes(
+                            operation.value
+                          );
+
+                          return (
+                            <button
+                              key={operation.value}
+                              type="button"
+                              onClick={() => toggleOperation(operation.value)}
+                              aria-pressed={on}
+                              aria-label={operation.name}
+                              title={operation.name}
+                              className={`h-10 w-12 rounded-lg text-lg font-medium transition ${focusRing} ${
+                                on
+                                  ? "bg-indigo-600 text-white shadow-sm"
+                                  : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50"
+                              }`}
+                            >
+                              {operation.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+
+                    <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      <NumberField
+                        label="First number: min digits"
+                        value={customSettings.leftMinDigits}
+                        min={1}
+                        max={6}
+                        onChange={(leftMinDigits) =>
+                          updateCustom({ leftMinDigits })
+                        }
+                      />
+                      <NumberField
+                        label="First number: max digits"
+                        value={customSettings.leftMaxDigits}
+                        min={1}
+                        max={6}
+                        onChange={(leftMaxDigits) =>
+                          updateCustom({ leftMaxDigits })
+                        }
+                      />
+                      <NumberField
+                        label="Second number: min digits"
+                        value={customSettings.rightMinDigits}
+                        min={1}
+                        max={6}
+                        onChange={(rightMinDigits) =>
+                          updateCustom({ rightMinDigits })
+                        }
+                      />
+                      <NumberField
+                        label="Second number: max digits"
+                        value={customSettings.rightMaxDigits}
+                        min={1}
+                        max={6}
+                        onChange={(rightMaxDigits) =>
+                          updateCustom({ rightMaxDigits })
+                        }
+                      />
+                    </div>
+
+                    {(customSettings.decimalPlaces > 0 ||
+                      customSettings.operations.includes("/")) && (
+                      <p className="mt-4 text-xs leading-5 text-slate-500">
+                        With decimals, only the first number has decimal places
+                        in multiplication and division. Division always has an
+                        exact answer.
+                      </p>
+                    )}
+
+                    {customError && (
+                      <p role="alert" className="mt-4 text-sm text-red-600">
+                        {customError}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-4 rounded-b-2xl border-t border-slate-100 bg-slate-50/60 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-600">
@@ -658,9 +969,13 @@ export default function DuelLobbyPage() {
                       <>
                         Selected:{" "}
                         <span className="font-semibold text-slate-900">
-                          Level {selectedConfiguration.level},{" "}
-                          {formatTimer(selectedConfiguration.timer)}
+                          {selectedLabel}
                         </span>
+                        {isCustomSelected && !customError && (
+                          <span className="block text-xs text-slate-500">
+                            {describeSettings(customSettings)}
+                          </span>
+                        )}
                       </>
                     ) : (
                       "Pick a level and a time limit to start."
@@ -670,7 +985,11 @@ export default function DuelLobbyPage() {
                   <button
                     type="button"
                     onClick={handleFindOpponent}
-                    disabled={loading || !selectedConfigurationId}
+                    disabled={
+                      loading ||
+                      !selectedConfigurationId ||
+                      Boolean(customError)
+                    }
                     className={`rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300 ${focusRing}`}
                   >
                     Find opponent
@@ -727,6 +1046,13 @@ export default function DuelLobbyPage() {
                             </p>
                           </div>
                         </div>
+
+                        {challenge.custom_settings && (
+                          <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                            Custom rules:{" "}
+                            {describeSettings(challenge.custom_settings)}
+                          </p>
+                        )}
 
                         <div className="mt-3 flex gap-2">
                           <button
@@ -840,7 +1166,8 @@ export default function DuelLobbyPage() {
                       !friend.is_online ||
                       !selectedConfigurationId ||
                       challengingFriendId !== null ||
-                      sentChallenge !== null;
+                      sentChallenge !== null ||
+                      Boolean(customError);
 
                     return (
                       <li

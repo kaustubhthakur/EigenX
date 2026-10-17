@@ -402,7 +402,8 @@ export function getLeaderboard(): Promise<LeaderboardResponse> {
 /* ------------------------------------------------------------------ */
 
 export function joinDuel(
-  configurationId: string | number
+  configurationId: string | number,
+  customSettings?: CustomSettings | null
 ): Promise<JoinDuelResponse> {
   const normalizedConfigurationId = String(
     configurationId ?? ""
@@ -418,6 +419,7 @@ export function joinDuel(
     method: "POST",
     body: {
       configurationId: normalizedConfigurationId,
+      customSettings: customSettings ?? undefined,
     },
   });
 }
@@ -444,7 +446,8 @@ export function leaveDuelQueue(): Promise<{
 
 export function challengeFriend(
   friendId: string | number,
-  configurationId: string | number
+  configurationId: string | number,
+  customSettings?: CustomSettings | null
 ): Promise<ChallengeResponse> {
   const normalizedFriendId = String(friendId ?? "").trim();
   const normalizedConfigurationId = String(
@@ -466,6 +469,7 @@ export function challengeFriend(
     body: {
       friendId: normalizedFriendId,
       configurationId: normalizedConfigurationId,
+      customSettings: customSettings ?? undefined,
     },
   });
 }

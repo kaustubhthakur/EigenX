@@ -1,5 +1,6 @@
 const Duel = require("../models/Duel");
 const User = require("../models/User");
+const { normalizeCustomSettings, buildQuestion } = require("./duelQuestion");
 
 const LEVEL_RANGE = 5;
 
@@ -56,6 +57,17 @@ exports.joinDuel = async (req, res) => {
       });
     }
 
+    const parsedSettings = normalizeCustomSettings(req.body.customSettings);
+
+    if (!parsedSettings.ok) {
+      return res.status(400).json({
+        success: false,
+        message: parsedSettings.message
+      });
+    }
+
+    const customSettings = parsedSettings.value;
+
     const me = await User.getUserWithLevel(userId);
 
     if (!me) {
@@ -79,7 +91,8 @@ exports.joinDuel = async (req, res) => {
       userId,
       configurationId,
       minLevel,
-      maxLevel
+      maxLevel,
+      customSettings
     );
 
     if (duel) {
@@ -90,7 +103,7 @@ exports.joinDuel = async (req, res) => {
       });
     }
 
-    await Duel.joinQueue(userId, configurationId);
+    await Duel.joinQueue(userId, configurationId, customSettings);
 
     return res.status(200).json({
       success: true,
@@ -306,18 +319,7 @@ exports.getQuestion = async (req, res) => {
     }
 
     if (!duel.current_question) {
-      const a = Math.floor(Math.random() * 20) + 1;
-      const b = Math.floor(Math.random() * 20) + 1;
-      const operators = ["+", "-", "*"];
-      const operator = operators[Math.floor(Math.random() * operators.length)];
-
-      let answer;
-
-      if (operator === "+") answer = a + b;
-      else if (operator === "-") answer = a - b;
-      else answer = a * b;
-
-      const question = `${a} ${operator} ${b}`;
+      const { question, answer } = buildQuestion(duel.custom_settings);
 
       duel = await Duel.saveCurrentQuestion(duelId, question, answer);
 
@@ -520,6 +522,17 @@ exports.challengeFriend = async (req, res) => {
       });
     }
 
+    const parsedSettings = normalizeCustomSettings(req.body.customSettings);
+
+    if (!parsedSettings.ok) {
+      return res.status(400).json({
+        success: false,
+        message: parsedSettings.message
+      });
+    }
+
+    const customSettings = parsedSettings.value;
+
     if (sameId(friendId, userId)) {
       return res.status(400).json({
         success: false,
@@ -567,7 +580,8 @@ exports.challengeFriend = async (req, res) => {
     const challenge = await Duel.createChallenge(
       userId,
       friendId,
-      configurationId
+      configurationId,
+      customSettings
     );
 
     return res.status(201).json({
@@ -654,7 +668,8 @@ exports.respondToChallenge = async (req, res) => {
     const duel = await Duel.createDuel(
       challenge.challenger_id,
       challenge.challenged_id,
-      challenge.configuration_id
+      challenge.configuration_id,
+      challenge.custom_settings ?? null
     );
 
     const accepted = await Duel.respondToChallenge(

@@ -3,6 +3,22 @@ const pool = require("../db");
 const sameId = (a, b) =>
   a != null && b != null && String(a) === String(b);
 
+const toJson = (settings) =>
+  settings ? JSON.stringify(settings) : null;
+
+// Order-independent comparison (Postgres returns JSONB keys in its own order)
+const stable = (settings) =>
+  settings == null
+    ? "null"
+    : JSON.stringify(
+        Object.keys(settings)
+          .sort()
+          .map((key) => [key, settings[key]])
+      );
+
+// A duel's time limit: custom rules override the configuration's timer
+const EFFECTIVE_TIMER = `COALESCE((d.custom_settings->>'timer')::int, c.timer)`;
+
 // Closes duels whose timer has run out but that nobody finished
 // (e.g. both players left). Without this they stay "active" forever and
 // block joining the queue or starting new duels.
@@ -22,7 +38,7 @@ exports.finishExpiredDuels = async (db = pool) => {
     WHERE c.id = d.configuration_id
       AND d.is_finished = FALSE
       AND d.started_at IS NOT NULL
-      AND d.started_at + (c.timer * INTERVAL '1 second') <= NOW()
+      AND d.started_at + (${EFFECTIVE_TIMER} * INTERVAL '1 second') <= NOW()
     `
   );
 };
@@ -31,7 +47,8 @@ exports.matchOpponent = async (
   userId,
   configurationId,
   minLevel,
-  maxLevel
+  maxLevel,
+  customSettings = null
 ) => {
   const client = await pool.connect();
 
@@ -47,6 +64,7 @@ exports.matchOpponent = async (
       WHERE dq.configuration_id = $1
         AND dq.matched = FALSE
         AND dq.user_id != $2
+        AND dq.custom_settings IS NOT DISTINCT FROM $5::jsonb
         AND u.is_online = TRUE
         AND FLOOR(u.xp / 100) + 1 BETWEEN $3 AND $4
         AND NOT EXISTS (
@@ -62,7 +80,7 @@ exports.matchOpponent = async (
       LIMIT 1
       FOR UPDATE OF dq SKIP LOCKED
       `,
-      [configurationId, userId, minLevel, maxLevel]
+      [configurationId, userId, minLevel, maxLevel, toJson(customSettings)]
     );
 
     if (rows.length === 0) {
@@ -96,12 +114,13 @@ exports.matchOpponent = async (
       INSERT INTO duels (
         player1_id,
         player2_id,
-        configuration_id
+        configuration_id,
+        custom_settings
       )
-      VALUES ($1, $2, $3)
+      VALUES ($1, $2, $3, $4::jsonb)
       RETURNING *
       `,
-      [opponent.user_id, userId, configurationId]
+      [opponent.user_id, userId, configurationId, toJson(customSettings)]
     );
 
     const duel = duelResult.rows[0];
@@ -131,7 +150,11 @@ exports.matchOpponent = async (
   }
 };
 
-exports.joinQueue = async (userId, configurationId) => {
+exports.joinQueue = async (
+  userId,
+  configurationId,
+  customSettings = null
+) => {
   const client = await pool.connect();
 
   try {
@@ -172,8 +195,8 @@ exports.joinQueue = async (userId, configurationId) => {
       const entry = existing.rows[0];
 
       if (
-        String(entry.configuration_id) ===
-        String(configurationId)
+        String(entry.configuration_id) === String(configurationId) &&
+        stable(entry.custom_settings) === stable(customSettings)
       ) {
         await client.query("COMMIT");
         return entry;
@@ -194,12 +217,13 @@ exports.joinQueue = async (userId, configurationId) => {
       INSERT INTO duel_queue (
         user_id,
         configuration_id,
-        matched
+        matched,
+        custom_settings
       )
-      VALUES ($1, $2, FALSE)
+      VALUES ($1, $2, FALSE, $3::jsonb)
       RETURNING *
       `,
-      [userId, configurationId]
+      [userId, configurationId, toJson(customSettings)]
     );
 
     await client.query("COMMIT");
@@ -244,7 +268,7 @@ exports.getQueueStatus = async (userId) => {
 exports.getDuel = async (duelId) => {
   const result = await pool.query(
     `
-    SELECT d.*, c.level, c.timer
+    SELECT d.*, c.level, ${EFFECTIVE_TIMER} AS timer
     FROM duels d
     JOIN configurations c ON c.id = d.configuration_id
     WHERE d.id = $1
@@ -268,7 +292,7 @@ exports.getActiveDuelForUser = async (userId) => {
       AND (d.player1_id = $1 OR d.player2_id = $1)
       AND (
         d.started_at IS NULL
-        OR d.started_at + (c.timer * INTERVAL '1 second') > NOW()
+        OR d.started_at + (${EFFECTIVE_TIMER} * INTERVAL '1 second') > NOW()
       )
     ORDER BY d.id DESC
     LIMIT 1
@@ -381,7 +405,7 @@ exports.updateScore = async (
 };
 
 // First correct answer wins the point and clears the question.
-// A wrong answer locks that player out; if both are wrong, the question clears.
+// A wrong answer changes nothing, so the player can try again.
 // `question` is the text the client saw; if it no longer matches the current
 // question, the answer is stale (the opponent was faster) and is ignored.
 exports.resolveAnswer = async (
@@ -461,7 +485,7 @@ exports.resolveAnswer = async (
     }
 
     const correct =
-      Number(answer) === Number(duel.current_answer);
+      Math.abs(Number(answer) - Number(duel.current_answer)) < 1e-6;
 
     if (correct) {
       await client.query(
@@ -567,7 +591,8 @@ exports.areFriends = async (userId1, userId2) => {
 exports.createDuel = async (
   player1Id,
   player2Id,
-  configurationId
+  configurationId,
+  customSettings = null
 ) => {
   await exports.finishExpiredDuels();
 
@@ -576,12 +601,13 @@ exports.createDuel = async (
     INSERT INTO duels (
       player1_id,
       player2_id,
-      configuration_id
+      configuration_id,
+      custom_settings
     )
-    VALUES ($1, $2, $3)
+    VALUES ($1, $2, $3, $4::jsonb)
     RETURNING *
     `,
-    [player1Id, player2Id, configurationId]
+    [player1Id, player2Id, configurationId, toJson(customSettings)]
   );
 
   return result.rows[0];
@@ -590,7 +616,8 @@ exports.createDuel = async (
 exports.createChallenge = async (
   challengerId,
   challengedId,
-  configurationId
+  configurationId,
+  customSettings = null
 ) => {
   const client = await pool.connect();
 
@@ -637,12 +664,13 @@ exports.createChallenge = async (
         challenger_id,
         challenged_id,
         configuration_id,
-        status
+        status,
+        custom_settings
       )
-      VALUES ($1, $2, $3, 'pending')
+      VALUES ($1, $2, $3, 'pending', $4::jsonb)
       RETURNING *
       `,
-      [challengerId, challengedId, configurationId]
+      [challengerId, challengedId, configurationId, toJson(customSettings)]
     );
 
     await client.query("COMMIT");

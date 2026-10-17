@@ -305,7 +305,8 @@ export default function DuelPage() {
                 <form onSubmit={handleSubmit} className="flex flex-col gap-3">
                   <input
                     type="number"
-                    inputMode="numeric"
+                    step="any"
+                    inputMode="decimal"
                     value={answerInput}
                     onChange={(event) => setAnswerInput(event.target.value)}
                     disabled={submitting || gameOver}
