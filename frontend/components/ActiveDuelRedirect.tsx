@@ -8,16 +8,14 @@ import { getActiveDuel } from "@/lib/api";
 // the challenger into the game once the friend accepts the challenge.
 export default function ActiveDuelRedirect() {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   useEffect(() => {
     // Already inside a duel
     if (pathname.startsWith("/duel/")) return;
 
-    // Not logged in: nothing to check
-    if (!localStorage.getItem("user")) return;
-
     let cancelled = false;
+    let lastError = "";
 
     const check = async () => {
       try {
@@ -26,8 +24,15 @@ export default function ActiveDuelRedirect() {
         if (!cancelled && data.success && data.duelId) {
           router.push(`/duel/${data.duelId}`);
         }
-      } catch {
-        // ignore (not logged in, network hiccup, etc.)
+      } catch (err) {
+        // Logged once per distinct error so you can see why it fails
+        // (401 = not logged in, 400/404/500 = route problem)
+        const message = err instanceof Error ? err.message : String(err);
+
+        if (message !== lastError) {
+          lastError = message;
+          console.warn("[ActiveDuelRedirect] /duel/active failed:", message);
+        }
       }
     };
 
