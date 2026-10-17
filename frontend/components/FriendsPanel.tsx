@@ -1,6 +1,6 @@
-
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   getAllUsers,
@@ -35,7 +35,84 @@ type IncomingRequest = {
 
 type Tab = "friends" | "requests" | "add";
 
-export default function FriendsPanel() {
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
+const scrollArea =
+  "max-h-80 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin]";
+
+function Avatar({
+  name,
+  src,
+  online,
+}: {
+  name: string;
+  src?: string | null;
+  online?: boolean;
+}) {
+  const url = src ? resolveAvatarUrl(src) : null;
+
+  return (
+    <div className="relative shrink-0">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
+        />
+      ) : (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-semibold text-white ring-2 ring-white/10">
+          {(name || "?").charAt(0).toUpperCase()}
+        </div>
+      )}
+
+      {online !== undefined && (
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
+            online
+              ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              : "bg-slate-600"
+          }`}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
+}
+
+function Row({
+  avatar,
+  title,
+  subtitle,
+  action,
+}: {
+  avatar: ReactNode;
+  title: string;
+  subtitle?: ReactNode;
+  action: ReactNode;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.07]">
+      <div className="flex min-w-0 items-center gap-3">
+        {avatar}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">{title}</p>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
+      </div>
+      {action}
+    </li>
+  );
+}
+
+function Empty({ children }: { children: ReactNode }) {
+  return <p className="py-10 text-center text-sm text-slate-500">{children}</p>;
+}
+
+export default function FriendsPanel(_props: {
+  currentUserId?: string | number;
+}) {
   const [activeTab, setActiveTab] = useState<Tab>("friends");
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<IncomingRequest[]>([]);
@@ -61,13 +138,10 @@ export default function FriendsPanel() {
           getAllUsers(),
         ]);
 
-
-      const profile = (
-        profileRes as {
-          user?: { id?: string | number };
-          id?: string | number;
-        }
-      );
+      const profile = profileRes as {
+        user?: { id?: string | number };
+        id?: string | number;
+      };
 
       const id = profile.user?.id ?? profile.id;
 
@@ -81,28 +155,14 @@ export default function FriendsPanel() {
       setFriends(friendsRes.friends ?? []);
       setRequests(requestsRes.requests ?? []);
 
- 
-      setUsers(
-        (usersRes.users ?? []).filter(
-          (user) => String(user.id) !== myId
-        )
-      );
+      setUsers((usersRes.users ?? []).filter((user) => String(user.id) !== myId));
 
-  
       setRequestedTo(
-        new Set(
-          (sentRes.requests ?? []).map((request) =>
-            String(request.receiver_id)
-          )
-        )
+        new Set((sentRes.requests ?? []).map((request) => String(request.receiver_id)))
       );
     } catch (err) {
       console.error("Failed to load friends:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load friends data."
-      );
+      setError(err instanceof Error ? err.message : "Failed to load friends data.");
     } finally {
       setLoading(false);
     }
@@ -123,7 +183,6 @@ export default function FriendsPanel() {
     try {
       await sendFriendRequest(id);
 
-   
       setRequestedTo((previous) => {
         const next = new Set(previous);
         next.add(id);
@@ -131,11 +190,7 @@ export default function FriendsPanel() {
       });
     } catch (err) {
       console.error("Send friend request failed:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to send friend request."
-      );
+      setError(err instanceof Error ? err.message : "Failed to send friend request.");
     } finally {
       setBusyId(null);
     }
@@ -175,117 +230,138 @@ export default function FriendsPanel() {
     user.username.toLowerCase().includes(search.toLowerCase())
   );
 
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: "friends", label: "Friends" },
+    { id: "requests", label: "Requests", count: requests.length },
+    { id: "add", label: "Add friend" },
+  ];
+
   return (
-    <section className="w-full overflow-hidden rounded-2xl border bg-white shadow-sm">
-      <div className="grid grid-cols-3 border-b">
-        {(
-          [
-            ["friends", "Friends"],
-            ["requests", "Requests"],
-            ["add", "Add friend"],
-          ] as [Tab, string][]
-        ).map(([tab, label]) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => {
-              setActiveTab(tab);
-              setError("");
-            }}
-            className={`border-b-2 px-3 py-4 text-sm ${
-              activeTab === tab
-                ? "border-violet-600 text-violet-600"
-                : "border-transparent text-gray-600"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <section
+      aria-label="Friends"
+      className="w-full overflow-hidden rounded-2xl bg-slate-900/70 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-xl"
+    >
+      <div role="tablist" className="grid grid-cols-3 border-b border-white/10">
+        {tabs.map(({ id, label, count }) => {
+          const active = activeTab === id;
+
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setActiveTab(id);
+                setError("");
+              }}
+              className={`relative flex items-center justify-center gap-2 px-3 py-4 text-sm font-medium transition-colors ${focusRing} ${
+                active ? "text-white" : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {label}
+              {count ? (
+                <span className="rounded-full bg-indigo-500 px-1.5 py-px text-[10px] font-semibold text-white">
+                  {count}
+                </span>
+              ) : null}
+              {active && (
+                <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-400 to-cyan-300" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="p-4">
+      <div className="p-4" role="tabpanel">
         {error && (
-          <p className="mb-3 text-sm text-red-500">{error}</p>
+          <p
+            role="alert"
+            className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-400/30"
+          >
+            {error}
+          </p>
         )}
 
         {loading ? (
-          <p className="py-8 text-center text-sm text-gray-500">
-            Loading friends...
-          </p>
+          <div className="animate-pulse space-y-3 py-1" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-3">
+                <div className="h-10 w-10 rounded-full bg-white/10" />
+                <div className="h-3.5 w-28 rounded bg-white/10" />
+              </div>
+            ))}
+          </div>
         ) : (
           <>
             {activeTab === "friends" && (
-              <div className="space-y-3">
+              <>
                 {friends.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-500">
-                    You haven't added any friends yet.
-                  </p>
+                  <Empty>You haven&apos;t added any friends yet.</Empty>
                 ) : (
-                  friends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        {friend.avatar ? (
-                          <img
-                            src={resolveAvatarUrl(friend.avatar)}
-                            alt=""
-                            className="h-10 w-10 rounded-full object-cover"
+                  <ul className={`space-y-2 ${scrollArea}`}>
+                    {friends.map((friend) => (
+                      <Row
+                        key={friend.id}
+                        avatar={
+                          <Avatar
+                            name={friend.username}
+                            src={friend.avatar}
+                            online={friend.is_online}
                           />
-                        ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
-                            {friend.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-
-                        <span className="font-medium">
-                          {friend.username}
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={busyId === String(friend.id)}
-                        onClick={() => void handleRemove(friend.id)}
-                        className="rounded-lg border px-3 py-2 text-sm text-red-500 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))
+                        }
+                        title={friend.username}
+                        subtitle={
+                          friend.is_online !== undefined ? (
+                            <span className={friend.is_online ? "text-emerald-400" : ""}>
+                              {friend.is_online ? "Online" : "Offline"}
+                            </span>
+                          ) : undefined
+                        }
+                        action={
+                          <button
+                            type="button"
+                            disabled={busyId === String(friend.id)}
+                            onClick={() => void handleRemove(friend.id)}
+                            className={`shrink-0 rounded-lg bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-300 ring-1 ring-inset ring-white/15 transition hover:bg-red-500/10 hover:text-red-300 hover:ring-red-400/40 disabled:opacity-50 ${focusRing}`}
+                          >
+                            Remove
+                          </button>
+                        }
+                      />
+                    ))}
+                  </ul>
                 )}
-              </div>
+              </>
             )}
 
             {activeTab === "requests" && (
-              <div className="space-y-3">
+              <>
                 {requests.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-500">
-                    No pending friend requests.
-                  </p>
+                  <Empty>No pending friend requests.</Empty>
                 ) : (
-                  requests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border p-3"
-                    >
-                      <span className="font-medium">
-                        {request.username}
-                      </span>
-
-                      <button
-                        type="button"
-                        disabled={busyId === String(request.id)}
-                        onClick={() => void handleAccept(request.id)}
-                        className="rounded-lg border border-violet-500 px-3 py-2 text-sm text-violet-600 disabled:opacity-50"
-                      >
-                        Accept
-                      </button>
-                    </div>
-                  ))
+                  <ul className={`space-y-2 ${scrollArea}`}>
+                    {requests.map((request) => (
+                      <Row
+                        key={request.id}
+                        avatar={<Avatar name={request.username} src={request.avatar} />}
+                        title={request.username}
+                        subtitle="Wants to be your friend"
+                        action={
+                          <button
+                            type="button"
+                            disabled={busyId === String(request.id)}
+                            onClick={() => void handleAccept(request.id)}
+                            className={`shrink-0 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 px-3.5 py-1.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50 ${focusRing}`}
+                          >
+                            {busyId === String(request.id) ? "Accepting..." : "Accept"}
+                          </button>
+                        }
+                      />
+                    ))}
+                  </ul>
                 )}
-              </div>
+              </>
             )}
 
             {activeTab === "add" && (
@@ -295,63 +371,41 @@ export default function FriendsPanel() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search by username..."
-                  className="mb-3 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-violet-500"
+                  aria-label="Search by username"
+                  className="mb-3 w-full rounded-lg border-0 bg-white/5 px-3 py-2.5 text-sm text-white ring-1 ring-inset ring-white/15 placeholder:text-slate-500 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
                 />
 
-                <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {filteredUsers.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-gray-500">
-                      No users found.
-                    </p>
-                  ) : (
-                    filteredUsers.map((user) => {
-                      const isRequested = requestedTo.has(
-                        String(user.id)
-                      );
+                {filteredUsers.length === 0 ? (
+                  <Empty>No users found.</Empty>
+                ) : (
+                  <ul className={`space-y-2 ${scrollArea}`}>
+                    {filteredUsers.map((user) => {
+                      const isRequested = requestedTo.has(String(user.id));
 
                       return (
-                        <div
+                        <Row
                           key={user.id}
-                          className="flex items-center justify-between gap-3 rounded-xl border p-3"
-                        >
-                          <div className="flex items-center gap-3">
-                            {user.avatar ? (
-                              <img
-                                src={resolveAvatarUrl(user.avatar)}
-                                alt=""
-                                className="h-10 w-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100">
-                                {user.username.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-
-                            <span className="font-medium">
-                              {user.username}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={
-                              isRequested ||
-                              busyId === String(user.id)
-                            }
-                            onClick={() => void handleSend(user.id)}
-                            className={`rounded-lg border px-3 py-2 text-sm ${
-                              isRequested
-                                ? "border-violet-200 text-violet-300"
-                                : "border-violet-500 text-violet-600"
-                            } disabled:cursor-not-allowed`}
-                          >
-                            {isRequested ? "Requested" : "Add"}
-                          </button>
-                        </div>
+                          avatar={<Avatar name={user.username} src={user.avatar} />}
+                          title={user.username}
+                          action={
+                            <button
+                              type="button"
+                              disabled={isRequested || busyId === String(user.id)}
+                              onClick={() => void handleSend(user.id)}
+                              className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${focusRing} ${
+                                isRequested
+                                  ? "bg-white/5 text-slate-500"
+                                  : "bg-indigo-500/15 text-indigo-200 ring-1 ring-inset ring-indigo-300/30 hover:bg-indigo-500/25"
+                              }`}
+                            >
+                              {isRequested ? "Requested" : "Add"}
+                            </button>
+                          }
+                        />
                       );
-                    })
-                  )}
-                </div>
+                    })}
+                  </ul>
+                )}
               </div>
             )}
           </>
