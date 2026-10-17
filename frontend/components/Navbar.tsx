@@ -1,5 +1,5 @@
 "use client";
-
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -119,21 +119,18 @@ export default function Navbar() {
             href="/"
             className={`flex items-center gap-2.5 rounded-lg ${focusRing}`}
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-inset ring-white/15">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#a5b4fc"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 12c-1.8-2.6-3.4-4-5.2-4C4.7 8 3 9.8 3 12s1.7 4 3.8 4c1.8 0 3.4-1.4 5.2-4zm0 0c1.8 2.6 3.4 4 5.2 4 2.1 0 3.8-1.8 3.8-4s-1.7-4-3.8-4c-1.8 0-3.4 1.4-5.2 4z" />
-              </svg>
-            </span>
+            
+
+  <Image
+    src="/logo.png"
+    alt="EigenX logo"
+    width={32}
+    height={32}
+    priority
+    className="h-8 w-8 rounded-lg object-contain"
+  />
+ 
+
             <span className="text-[15px] font-semibold tracking-tight text-white">
               EigenX
             </span>
