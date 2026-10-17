@@ -114,6 +114,12 @@ exports.getDuelById = async (req, res) => {
     const { duelId } = req.params;
     const userId = req.user.id;
 
+    // "/duel/active" can be swallowed by "/:duelId" depending on route
+    // order, so handle it here too.
+    if (duelId === "active") {
+      return exports.getActiveDuel(req, res);
+    }
+
     if (!isValidId(duelId)) {
       return res.status(400).json({
         success: false,
