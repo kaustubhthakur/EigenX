@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getDuelQuestion, submitDuelAnswer } from "@/lib/api";
+import DuelScene from "@/components/DuelScene";
 
 type DuelResponse = {
   success: boolean;
@@ -34,6 +35,103 @@ type AnswerResponse = DuelResponse & {
   nextQuestion?: boolean;
 };
 
+const focusRing =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+
+const glass =
+  "rounded-2xl bg-slate-900/60 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+
+/* Circular countdown. Total time is the first value we see from the server. */
+function TimerRing({
+  remaining,
+  total,
+}: {
+  remaining: number | null;
+  total: number | null;
+}) {
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const progress =
+    remaining !== null && total
+      ? Math.max(0, Math.min(1, remaining / total))
+      : 1;
+  const urgent = remaining !== null && remaining <= 10;
+
+  return (
+    <div
+      className="relative flex h-28 w-28 items-center justify-center"
+      role="timer"
+      aria-label="Time remaining"
+    >
+      <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          strokeWidth="6"
+          className="stroke-white/10"
+        />
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - progress)}
+          className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${
+            urgent ? "stroke-rose-400" : "stroke-cyan-300"
+          }`}
+        />
+      </svg>
+
+      <div className="text-center">
+        <p
+          className={`text-3xl font-semibold tabular-nums ${
+            urgent ? "text-rose-300" : "text-white"
+          }`}
+        >
+          {remaining === null ? "--" : remaining}
+        </p>
+        <p className="-mt-0.5 text-xs text-slate-400">seconds</p>
+      </div>
+    </div>
+  );
+}
+
+function Score({
+  label,
+  value,
+  leading,
+  align,
+}: {
+  label: string;
+  value: number;
+  leading: boolean;
+  align: "left" | "right";
+}) {
+  return (
+    <div className={align === "right" ? "text-right" : "text-left"}>
+      <p className="text-sm text-slate-400">{label}</p>
+      <p
+        className={`text-5xl font-semibold tabular-nums transition-colors ${
+          leading ? "text-white" : "text-slate-300"
+        }`}
+      >
+        {value}
+      </p>
+      <span
+        className={`mt-2 inline-block h-1 w-10 rounded-full transition-opacity ${
+          leading ? "bg-gradient-to-r from-indigo-400 to-cyan-300" : "opacity-0"
+        }`}
+        aria-hidden="true"
+      />
+    </div>
+  );
+}
+
 export default function DuelPage() {
   const params = useParams<{ duelId: string }>();
   const router = useRouter();
@@ -45,6 +143,7 @@ export default function DuelPage() {
   const [player2Score, setPlayer2Score] = useState(0);
   const [isPlayer1, setIsPlayer1] = useState<boolean | null>(null);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
+  const [totalTime, setTotalTime] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
   const [opponentAnswered, setOpponentAnswered] = useState(false);
   const [waitingForOpponent, setWaitingForOpponent] = useState(false);
@@ -86,7 +185,10 @@ export default function DuelPage() {
     }
 
     if (typeof data.remainingTime === "number") {
-      setRemainingTime(data.remainingTime);
+      const seconds = data.remainingTime;
+      setRemainingTime(seconds);
+      // The first reading is the full duel length, used for the timer ring
+      setTotalTime((current) => current ?? seconds);
     }
 
     if (data.duel) {
@@ -199,9 +301,7 @@ export default function DuelPage() {
 
         if (!data.gameOver) {
           setLastResult(
-            data.correct
-              ? "Correct! +1 point"
-              : "Wrong answer, try again!"
+            data.correct ? "Correct! +1 point" : "Wrong answer, try again!"
           );
         }
       }
@@ -212,9 +312,7 @@ export default function DuelPage() {
 
       if (data.success && !data.gameOver) {
         setLastResult(
-          data.correct
-            ? "Correct! +1 point"
-            : "Wrong answer, try again!"
+          data.correct ? "Correct! +1 point" : "Wrong answer, try again!"
         );
       }
     } catch (err) {
@@ -239,116 +337,182 @@ export default function DuelPage() {
   const ownScore = isPlayer1 === false ? player2Score : player1Score;
   const opponentScore = isPlayer1 === false ? player1Score : player2Score;
 
-  const resultText = gameOver
-    ? winnerId == null
-      ? "The duel ended in a tie."
+  const outcome: "win" | "lose" | "tie" | null = !gameOver
+    ? null
+    : winnerId == null
+      ? "tie"
       : playerId !== null && String(winnerId) === String(playerId)
+        ? "win"
+        : "lose";
+
+  const resultText =
+    outcome === "tie"
+      ? "The duel ended in a tie."
+      : outcome === "win"
         ? "You won!"
-        : "Your opponent won."
-    : "";
+        : outcome === "lose"
+          ? "Your opponent won."
+          : "";
+
+  const resultTone =
+    outcome === "win"
+      ? "from-emerald-300 to-cyan-300"
+      : outcome === "lose"
+        ? "from-rose-300 to-orange-300"
+        : "from-indigo-300 to-violet-300";
+
+  const feedbackIsGood = lastResult?.startsWith("Correct");
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center gap-6 px-4 py-8">
-      <div className="w-full rounded-2xl border p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-gray-500">Your score</p>
-            <p className="text-3xl font-bold">{ownScore}</p>
-          </div>
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] text-slate-100">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_35%,rgba(99,102,241,0.22),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.12),transparent)]"
+      />
+      <DuelScene focus="center" />
 
-          <div className="text-center">
-            <p className="text-sm text-gray-500">Time remaining</p>
-            <p className="text-2xl font-semibold">
-              {remainingTime === null ? "--" : `${remainingTime}s`}
-            </p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Opponent</p>
-            <p className="text-3xl font-bold">{opponentScore}</p>
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-4 py-10">
+        {/* Scoreboard */}
+        <div className={`${glass} px-6 py-5`}>
+          <div className="flex items-center justify-between gap-4">
+            <Score
+              label="You"
+              value={ownScore}
+              leading={ownScore > opponentScore}
+              align="left"
+            />
+            <TimerRing remaining={remainingTime} total={totalTime} />
+            <Score
+              label="Opponent"
+              value={opponentScore}
+              leading={opponentScore > ownScore}
+              align="right"
+            />
           </div>
         </div>
-      </div>
 
-      {gameOver ? (
-        <section className="w-full rounded-2xl border p-8 text-center">
-          <h1 className="text-3xl font-bold">Duel finished</h1>
-          <p className="mt-3 text-lg">{resultText}</p>
+        {gameOver ? (
+          <section className={`${glass} px-6 py-12 text-center`}>
+            <h1
+              className={`bg-gradient-to-r bg-clip-text text-5xl font-semibold tracking-tight text-transparent ${resultTone}`}
+            >
+              {outcome === "win"
+                ? "Victory"
+                : outcome === "lose"
+                  ? "Defeat"
+                  : "Draw"}
+            </h1>
+            <p className="mt-3 text-lg text-slate-300">{resultText}</p>
+            <p className="mt-1 text-sm tabular-nums text-slate-500">
+              Final score {ownScore} to {opponentScore}
+            </p>
 
-          <button
-            type="button"
-            onClick={() => router.push("/duel")}
-            className="mt-6 rounded-xl bg-blue-600 px-5 py-3 font-medium text-white"
-          >
-            Back to duels
-          </button>
-        </section>
-      ) : (
-        <section className="w-full rounded-2xl border p-6 text-center shadow-sm">
-          <h1 className="text-2xl font-bold">Arithmetic Duel</h1>
+            <button
+              type="button"
+              onClick={() => router.push("/duel")}
+              className={`mt-8 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-7 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`}
+            >
+              Back to duels
+            </button>
+          </section>
+        ) : (
+          <section className={`${glass} px-6 py-10 text-center sm:px-10`}>
+            <h1 className="sr-only">Arithmetic duel</h1>
 
-          {question ? (
-            <>
-              <p className="my-8 text-4xl font-bold">{question}</p>
-
-              {lastResult && (
-                <p className="mb-4 font-medium">{lastResult}</p>
-              )}
-
-              {answered ? (
-                <p className="mb-4 text-gray-500">
-                  {opponentAnswered
-                    ? "Both players have answered. Loading the next question..."
-                    : "Answer submitted. Waiting for the next question..."}
+            {question ? (
+              <>
+                <p
+                  className="bg-gradient-to-b from-white to-indigo-200 bg-clip-text text-5xl font-semibold tabular-nums tracking-tight text-transparent sm:text-6xl"
+                  aria-live="polite"
+                >
+                  {question}
                 </p>
-              ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-                  <input
-                    type="number"
-                    step="any"
-                    inputMode="decimal"
-                    value={answerInput}
-                    onChange={(event) => setAnswerInput(event.target.value)}
-                    disabled={submitting || gameOver}
-                    placeholder="Enter your answer"
-                    className="w-full rounded-xl border px-4 py-3 text-lg"
-                    autoFocus
-                  />
 
-                  <button
-                    type="submit"
-                    disabled={
-                      submitting ||
-                      answered ||
-                      !answerInput.trim() ||
-                      gameOver
-                    }
-                    className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                <div className="mt-6 min-h-[2.75rem]">
+                  {lastResult && (
+                    <p
+                      role="status"
+                      className={`inline-block rounded-full px-4 py-1.5 text-sm font-medium ring-1 ${
+                        feedbackIsGood
+                          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-400/30"
+                          : "bg-amber-500/10 text-amber-200 ring-amber-400/30"
+                      }`}
+                    >
+                      {lastResult}
+                    </p>
+                  )}
+                </div>
+
+                {answered ? (
+                  <p className="mt-2 flex items-center justify-center gap-2 text-slate-400">
+                    <span
+                      className="h-2 w-2 animate-pulse rounded-full bg-cyan-300 motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                    {opponentAnswered
+                      ? "Both players have answered. Loading the next question..."
+                      : "Answer submitted. Waiting for the next question..."}
+                  </p>
+                ) : (
+                  <form
+                    onSubmit={handleSubmit}
+                    className="mx-auto mt-2 flex max-w-sm flex-col gap-3"
                   >
-                    {submitting ? "Submitting..." : "Submit answer"}
-                  </button>
-                </form>
-              )}
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      value={answerInput}
+                      onChange={(event) => setAnswerInput(event.target.value)}
+                      disabled={submitting || gameOver}
+                      placeholder="Your answer"
+                      aria-label="Your answer"
+                      className="w-full rounded-xl border-0 bg-white/5 px-4 py-4 text-center text-2xl font-medium tabular-nums text-white placeholder:text-slate-500 ring-1 ring-inset ring-white/15 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                      autoFocus
+                    />
 
-              {waitingForOpponent && (
-                <p className="mt-4 text-sm text-gray-500">
-                  Your opponent is still answering.
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="py-10 text-gray-500">
-              Waiting for the first question...
-            </p>
-          )}
+                    <button
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        answered ||
+                        !answerInput.trim() ||
+                        gameOver
+                      }
+                      className={`w-full rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${focusRing}`}
+                    >
+                      {submitting ? "Submitting..." : "Submit answer"}
+                    </button>
+                  </form>
+                )}
 
-          {error && (
-            <p role="alert" className="mt-4 text-sm text-red-600">
-              {error}
-            </p>
-          )}
-        </section>
-      )}
-    </main>
+                {waitingForOpponent && (
+                  <p className="mt-5 text-sm text-slate-500">
+                    Your opponent is still answering.
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-10 text-slate-400">
+                <span
+                  className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-cyan-300 motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                <p>Waiting for the first question...</p>
+              </div>
+            )}
+
+            {error && (
+              <p
+                role="alert"
+                className="mx-auto mt-5 max-w-sm rounded-lg bg-red-500/10 px-4 py-2.5 text-sm text-red-200 ring-1 ring-red-400/30"
+              >
+                {error}
+              </p>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
   );
 }
