@@ -6,7 +6,6 @@ const sameId = (a, b) =>
 const toJson = (settings) =>
   settings ? JSON.stringify(settings) : null;
 
-// Order-independent comparison (Postgres returns JSONB keys in its own order)
 const stable = (settings) =>
   settings == null
     ? "null"
@@ -16,12 +15,10 @@ const stable = (settings) =>
           .map((key) => [key, settings[key]])
       );
 
-// A duel's time limit: custom rules override the configuration's timer
+
 const EFFECTIVE_TIMER = `COALESCE((d.custom_settings->>'timer')::int, c.timer)`;
 
-// Closes duels whose timer has run out but that nobody finished
-// (e.g. both players left). Without this they stay "active" forever and
-// block joining the queue or starting new duels.
+
 exports.finishExpiredDuels = async (db = pool) => {
   await db.query(
     `
@@ -279,7 +276,7 @@ exports.getDuel = async (duelId) => {
   return result.rows[0] || null;
 };
 
-// NEW: used by the challenger's lobby to find out the duel was created
+
 exports.getActiveDuelForUser = async (userId) => {
   await exports.finishExpiredDuels();
 
@@ -404,10 +401,7 @@ exports.updateScore = async (
   return result.rows[0] || null;
 };
 
-// First correct answer wins the point and clears the question.
-// A wrong answer changes nothing, so the player can try again.
-// `question` is the text the client saw; if it no longer matches the current
-// question, the answer is stale (the opponent was faster) and is ignored.
+
 exports.resolveAnswer = async (
   duelId,
   playerId,
@@ -509,8 +503,7 @@ exports.resolveAnswer = async (
         [duelId, playerId]
       );
     }
-    // Wrong answer: nothing changes. The player can try again until
-    // someone answers correctly or the timer ends.
+
 
     const latestResult = await client.query(
       `
