@@ -12,6 +12,7 @@ const dashboardrouter = require('./routes/dashboard')
 const configurationrouter = require('./routes/configuration')
 const duelrouter = require('./routes/duel')
 const gamerouter = require('./routes/game')
+const worldchatrouter = require('./routes/worldchat')
 const PORT = process.env.PORT || 8081;
 const app = express();
 const path = require("path");
@@ -37,6 +38,8 @@ app.use("/configuration",configurationrouter)
 app.use("/game",gamerouter)
 app.use("/friends", friendsrouter);
 app.use("/duel",duelrouter)
+app.use("/worldchat",worldchatrouter)
+
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
