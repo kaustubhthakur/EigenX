@@ -233,11 +233,16 @@ exports.getDuel = async (duelId) => {
 exports.getActiveDuelForUser = async (userId) => {
   const result = await pool.query(
     `
-    SELECT id
-    FROM duels
-    WHERE is_finished = FALSE
-      AND (player1_id = $1 OR player2_id = $1)
-    ORDER BY id DESC
+    SELECT d.id
+    FROM duels d
+    JOIN configurations c ON c.id = d.configuration_id
+    WHERE d.is_finished = FALSE
+      AND (d.player1_id = $1 OR d.player2_id = $1)
+      AND (
+        d.started_at IS NULL
+        OR d.started_at + (c.timer * INTERVAL '1 second') > NOW()
+      )
+    ORDER BY d.id DESC
     LIMIT 1
     `,
     [userId]
@@ -451,45 +456,9 @@ exports.resolveAnswer = async (
         `,
         [duelId, playerId]
       );
-    } else {
-      const updated = await client.query(
-        `
-        UPDATE duels
-        SET
-          player1_answered = CASE
-            WHEN player1_id = $2 THEN TRUE
-            ELSE player1_answered
-          END,
-          player2_answered = CASE
-            WHEN player2_id = $2 THEN TRUE
-            ELSE player2_answered
-          END
-        WHERE id = $1
-        RETURNING *
-        `,
-        [duelId, playerId]
-      );
-
-      const current = updated.rows[0];
-
-      if (
-        current.player1_answered &&
-        current.player2_answered
-      ) {
-        await client.query(
-          `
-          UPDATE duels
-          SET
-            current_question = NULL,
-            current_answer = NULL,
-            player1_answered = FALSE,
-            player2_answered = FALSE
-          WHERE id = $1
-          `,
-          [duelId]
-        );
-      }
     }
+    // Wrong answer: nothing changes. The player can try again until
+    // someone answers correctly or the timer ends.
 
     const latestResult = await client.query(
       `

@@ -201,7 +201,7 @@ export default function DuelPage() {
           setLastResult(
             data.correct
               ? "Correct! +1 point"
-              : "Wrong answer. Waiting for your opponent..."
+              : "Wrong answer, try again!"
           );
         }
       }
@@ -214,7 +214,7 @@ export default function DuelPage() {
         setLastResult(
           data.correct
             ? "Correct! +1 point"
-            : "Wrong answer. Waiting for your opponent..."
+            : "Wrong answer, try again!"
         );
       }
     } catch (err) {
