@@ -274,9 +274,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Temporary: FriendsPanel is still light-themed, so give it dark text
-            until it is restyled. */}
-        <div className="mt-6 text-gray-900">
+        <div className="mt-6">
           <FriendsPanel currentUserId={profile.id} />
         </div>
       </div>
