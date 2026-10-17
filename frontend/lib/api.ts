@@ -7,7 +7,15 @@ import type {
   VerifyOtpPayload,
   VerifyOtpResponse,
 } from "../types/auth";
-
+import type {
+  WorldMessagesResponse,
+  WorldPostMessageResponse,
+  WorldOnlineResponse,
+  WorldProfileResponse,
+  WorldRequestResponse,
+  WorldRequestsResponse,
+  WorldAcceptResponse,
+} from "../types/worldchat";
 import type {
   UserProfile,
   ProfileResponse,
@@ -38,7 +46,7 @@ const CONFIG_API_URL = `${API_HOST}/configuration`;
 const GAME_API_URL = `${API_HOST}/game`;
 const DASHBOARD_API_URL = `${API_HOST}/dashboard`;
 const DUEL_API_URL = `${API_HOST}/duel`;
-
+const WORLDCHAT_API_URL = `${API_HOST}/worldchat`;
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   body?: unknown;
