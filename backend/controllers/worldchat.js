@@ -1,17 +1,9 @@
-const worldChat = require("../models/worldChat");
-const duelModel = require("../models/duel"); // ADAPT: your existing duel model
-
-/**
- * World chat controller.
- * Assumes your auth middleware sets req.user.id.
- * Live updates are optional: if you set `app.set("io", io)` (Socket.IO),
- * events go to the "world" room and to each user's "user:<id>" room.
- */
+const worldChat = require("../models/WorldChat");
+const duelModel = require("../models/Duel"); 
 
 const MESSAGE_COOLDOWN_MS = 1000;
-const lastMessageAt = new Map(); // userId -> timestamp (simple spam guard)
+const lastMessageAt = new Map(); 
 
-/* ───────────── helpers ───────────── */
 
 const toId = (value) => {
   const n = Number(value);
@@ -28,11 +20,7 @@ const emitToUser = (req, userId, event, payload) => {
   if (io) io.to(`user:${userId}`).emit(event, payload);
 };
 
-/**
- * Create the real duel for an accepted world-chat request.
- * ADAPT this to your duel model. Every world-chat duel uses the one
- * fixed custom level in WORLD_DUEL_CONFIG.
- */
+
 const createWorldDuel = async ({ senderId, receiverId }) => {
   const duel = await duelModel.createDuel({
     challengerId: senderId,
@@ -43,7 +31,7 @@ const createWorldDuel = async ({ senderId, receiverId }) => {
   return duel.id;
 };
 
-/* ───────────── messages ───────────── */
+
 
 exports.getMessages = async (req, res) => {
   try {
@@ -113,7 +101,7 @@ exports.deleteMessage = async (req, res) => {
   }
 };
 
-/* ───────────── people ───────────── */
+
 
 exports.getOnlineUsers = async (req, res) => {
   try {
@@ -144,7 +132,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-/* ───────────── duel requests ───────────── */
+
 
 exports.sendDuelRequest = async (req, res) => {
   try {
@@ -200,7 +188,7 @@ exports.getOutgoing = async (req, res) => {
   }
 };
 
-/** Explains why a request can't be answered (missing, expired, already used). */
+
 const explainUnavailable = async (res, requestId) => {
   const existing = await worldChat.getRequestById(requestId);
 
