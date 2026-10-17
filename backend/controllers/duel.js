@@ -1,8 +1,5 @@
-
 const Duel = require("../models/Duel");
-const Game = require("../models/Game");
 const User = require("../models/User");
-const { generateQuestion } = require("./game");
 
 const LEVEL_RANGE = 5;
 
@@ -15,7 +12,10 @@ const isValidId = (value) =>
     Number.isSafeInteger(value) &&
     value > 0);
 
+// If the duel has no start time yet, treat it as 0 seconds elapsed
 const getElapsedSeconds = (startedAt) => {
+  if (!startedAt) return 0;
+
   const start = new Date(startedAt).getTime();
 
   if (!Number.isFinite(start)) {
@@ -28,6 +28,7 @@ const getElapsedSeconds = (startedAt) => {
 const getGameOverResponse = (duel) => ({
   success: true,
   gameOver: true,
+  duel,
   player1Score: duel.player1_score,
   player2Score: duel.player2_score,
   winnerId: duel.winner_id
@@ -38,6 +39,10 @@ const getParticipant = (duel, userId) => {
   if (sameId(duel.player2_id, userId)) return 2;
   return 0;
 };
+
+/* ------------------------------------------------------------------ */
+/* Matchmaking queue                                                   */
+/* ------------------------------------------------------------------ */
 
 exports.joinDuel = async (req, res) => {
   try {
@@ -95,9 +100,11 @@ exports.joinDuel = async (req, res) => {
   } catch (err) {
     console.error("joinDuel error:", err);
 
-    return res.status(500).json({
+    return res.status(err.statusCode || 500).json({
       success: false,
-      message: "Failed to join duel queue"
+      message: err.statusCode
+        ? err.message
+        : "Failed to join duel queue"
     });
   }
 };
@@ -110,7 +117,7 @@ exports.getDuelById = async (req, res) => {
     if (!isValidId(duelId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid duelId",
+        message: "Invalid duelId"
       });
     }
 
@@ -119,27 +126,27 @@ exports.getDuelById = async (req, res) => {
     if (!duel) {
       return res.status(404).json({
         success: false,
-        message: "Duel not found",
+        message: "Duel not found"
       });
     }
 
     if (!getParticipant(duel, userId)) {
       return res.status(403).json({
         success: false,
-        message: "Not a participant in this duel",
+        message: "Not a participant in this duel"
       });
     }
 
     return res.status(200).json({
       success: true,
-      duel,
+      duel
     });
   } catch (err) {
     console.error("getDuelById error:", err);
 
     return res.status(500).json({
       success: false,
-      message: "Failed to retrieve duel details",
+      message: "Failed to retrieve duel details"
     });
   }
 };
@@ -211,11 +218,46 @@ exports.leaveDuelQueue = async (req, res) => {
   }
 };
 
+/* ------------------------------------------------------------------ */
+/* Active duel lookup (so the challenger can be sent into the duel)    */
+/* Route must be registered BEFORE any "/:duelId" route:               */
+/*   router.get("/active", auth, duelController.getActiveDuel);        */
+/* Requires Duel.getActiveDuelForUser in the model.                    */
+/* ------------------------------------------------------------------ */
+
+exports.getActiveDuel = async (req, res) => {
+  try {
+    const duel = await Duel.getActiveDuelForUser(req.user.id);
+
+    return res.status(200).json({
+      success: true,
+      duelId: duel ? duel.id : null
+    });
+  } catch (err) {
+    console.error("getActiveDuel error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to check active duel"
+    });
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/* Gameplay                                                            */
+/* ------------------------------------------------------------------ */
 
 exports.getQuestion = async (req, res) => {
   try {
     const { duelId } = req.params;
     const playerId = req.user.id;
+
+    if (!isValidId(duelId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid duelId"
+      });
+    }
 
     let duel = await Duel.getDuel(duelId);
 
@@ -226,41 +268,33 @@ exports.getQuestion = async (req, res) => {
       });
     }
 
-    const isPlayer1 = String(duel.player1_id) === String(playerId);
-    const isPlayer2 = String(duel.player2_id) === String(playerId);
+    const participant = getParticipant(duel, playerId);
 
-    if (!isPlayer1 && !isPlayer2) {
+    if (!participant) {
       return res.status(403).json({
         success: false,
         message: "You are not a participant in this duel"
       });
     }
 
+    const isPlayer1 = participant === 1;
+
     if (duel.is_finished) {
       return res.json({
-        success: true,
-        gameOver: true,
-        duel,
-        player1Score: duel.player1_score,
-        player2Score: duel.player2_score
+        ...getGameOverResponse(duel),
+        isPlayer1
       });
     }
 
-    const elapsedSeconds = duel.started_at
-      ? Math.floor((Date.now() - new Date(duel.started_at).getTime()) / 1000)
-      : 0;
-
+    const elapsedSeconds = getElapsedSeconds(duel.started_at);
     const remainingTime = Math.max(0, Number(duel.timer) - elapsedSeconds);
 
     if (remainingTime <= 0) {
       duel = await Duel.finishDuel(duelId);
 
       return res.json({
-        success: true,
-        gameOver: true,
-        duel,
-        player1Score: duel.player1_score,
-        player2Score: duel.player2_score,
+        ...getGameOverResponse(duel),
+        isPlayer1,
         remainingTime: 0
       });
     }
@@ -281,7 +315,7 @@ exports.getQuestion = async (req, res) => {
 
       duel = await Duel.saveCurrentQuestion(duelId, question, answer);
 
-      if (!duel || duel.is_finished) {
+      if (!duel || duel.is_finished || !duel.current_question) {
         return res.status(409).json({
           success: false,
           message: "Unable to load the current question"
@@ -299,6 +333,7 @@ exports.getQuestion = async (req, res) => {
 
     return res.json({
       success: true,
+      isPlayer1,
       question: duel.current_question,
       player1Score: duel.player1_score,
       player2Score: duel.player2_score,
@@ -319,135 +354,13 @@ exports.getQuestion = async (req, res) => {
   }
 };
 
+// First correct answer wins the point and immediately moves to the next
+// question. A wrong answer locks that player out until the question changes.
 exports.submitAnswer = async (req, res) => {
   try {
-    const { duelId } = req.params;
-    const { answer } = req.body;
+    const duelId = req.params.duelId ?? req.body.duelId;
+    const { answer, question } = req.body;
     const playerId = req.user.id;
-
-    if (answer === undefined || answer === null || String(answer).trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Answer is required"
-      });
-    }
-
-    const duel = await Duel.getDuel(duelId);
-
-    if (!duel) {
-      return res.status(404).json({
-        success: false,
-        message: "Duel not found"
-      });
-    }
-
-    const isPlayer1 = String(duel.player1_id) === String(playerId);
-    const isPlayer2 = String(duel.player2_id) === String(playerId);
-
-    if (!isPlayer1 && !isPlayer2) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a participant in this duel"
-      });
-    }
-
-    if (duel.is_finished) {
-      return res.status(409).json({
-        success: false,
-        gameOver: true,
-        message: "This duel has finished"
-      });
-    }
-
-    const elapsedSeconds = duel.started_at
-      ? Math.floor((Date.now() - new Date(duel.started_at).getTime()) / 1000)
-      : 0;
-
-    if (elapsedSeconds >= Number(duel.timer)) {
-      const finishedDuel = await Duel.finishDuel(duelId);
-
-      return res.json({
-        success: true,
-        gameOver: true,
-        duel: finishedDuel,
-        player1Score: finishedDuel.player1_score,
-        player2Score: finishedDuel.player2_score
-      });
-    }
-
-    const result = await Duel.resolveAnswer(
-      duelId,
-      playerId,
-      answer
-    );
-
-    if (result.status === "not_found") {
-      return res.status(404).json({
-        success: false,
-        message: "Duel not found"
-      });
-    }
-
-    if (result.status === "forbidden") {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a participant in this duel"
-      });
-    }
-
-    if (result.status === "game_over") {
-      return res.status(409).json({
-        success: false,
-        gameOver: true,
-        duel: result.duel
-      });
-    }
-
-    if (result.status === "already_answered") {
-      return res.status(409).json({
-        success: false,
-        message: "You have already answered this question",
-        player1Score: result.duel.player1_score,
-        player2Score: result.duel.player2_score
-      });
-    }
-
-    if (result.status === "no_question") {
-      return res.status(409).json({
-        success: false,
-        message: "There is no active question. Please refresh."
-      });
-    }
-
-    return res.json({
-      success: true,
-      correct: result.correct,
-      score: result.score,
-      player1Score: result.player1Score,
-      player2Score: result.player2Score,
-      player1Answered: result.player1Answered,
-      player2Answered: result.player2Answered,
-      opponentAnswered: isPlayer1
-        ? result.player2Answered
-        : result.player1Answered,
-      question: result.question,
-      nextQuestion: result.nextQuestion,
-      duel: result.duel
-    });
-  } catch (err) {
-    console.error("submitAnswer error:", err);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to submit answer"
-    });
-  }
-};
-
-
-exports.submitAnswer = async (req, res) => {
-  try {
-    const { duelId, answer } = req.body;
 
     if (!isValidId(duelId)) {
       return res.status(400).json({
@@ -476,11 +389,7 @@ exports.submitAnswer = async (req, res) => {
       });
     }
 
-    if (duel.is_finished) {
-      return res.status(200).json(getGameOverResponse(duel));
-    }
-
-    const participant = getParticipant(duel, req.user.id);
+    const participant = getParticipant(duel, playerId);
 
     if (!participant) {
       return res.status(403).json({
@@ -489,7 +398,13 @@ exports.submitAnswer = async (req, res) => {
       });
     }
 
-    const elapsed = getElapsedSeconds(duel.started_at);
+    if (duel.is_finished) {
+      return res.status(200).json({
+        ...getGameOverResponse(duel),
+        isPlayer1: participant === 1
+      });
+    }
+
     const timer = Number(duel.timer);
 
     if (!Number.isFinite(timer) || timer <= 0) {
@@ -499,68 +414,79 @@ exports.submitAnswer = async (req, res) => {
       });
     }
 
-    if (elapsed >= timer) {
-      const finished = await Duel.finishDuel(duel.id);
+    if (getElapsedSeconds(duel.started_at) >= timer) {
+      const finished = await Duel.finishDuel(duelId);
 
-      return res.status(200).json(
-        getGameOverResponse(finished)
-      );
-    }
-
-    if (!duel.current_question) {
-      return res.status(409).json({
-        success: false,
-        message: "No active question. Fetch the current question first."
+      return res.status(200).json({
+        ...getGameOverResponse(finished),
+        isPlayer1: participant === 1
       });
     }
 
-    const alreadyAnswered = participant === 1
-      ? duel.player1_answered
-      : duel.player2_answered;
-
-    if (alreadyAnswered) {
-      return res.status(409).json({
-        success: false,
-        message: "Already answered this question"
-      });
-    }
-
-    const correct =
-      Number(answer) === Number(duel.current_answer);
-
-    const myScore = Number(
-      participant === 1
-        ? duel.player1_score
-        : duel.player2_score
-    ) + (correct ? 1 : 0);
-
-    if (correct) {
-      await Duel.updateScore(duel.id, req.user.id, myScore);
-    }
-
-    const updated = await Duel.markAnswered(
-      duel.id,
-      req.user.id
+    const result = await Duel.resolveAnswer(
+      duelId,
+      playerId,
+      answer,
+      question
     );
 
-    const opponentAnswered = participant === 1
-      ? updated.player2_answered
-      : updated.player1_answered;
+    switch (result.status) {
+      case "not_found":
+        return res.status(404).json({
+          success: false,
+          message: "Duel not found"
+        });
 
-    const roundCompleted = Boolean(
-      updated.player1_answered && updated.player2_answered
-    );
+      case "forbidden":
+        return res.status(403).json({
+          success: false,
+          message: "Not a participant in this duel"
+        });
 
-    if (roundCompleted) {
-      await Duel.clearCurrentQuestion(duel.id);
+      case "game_over":
+        return res.status(200).json({
+          ...getGameOverResponse(result.duel),
+          isPlayer1: participant === 1
+        });
+
+      case "already_answered":
+        return res.status(409).json({
+          success: false,
+          message: "You already answered this question"
+        });
+
+      case "stale":
+      case "no_question":
+        // Opponent was faster and the question has already changed
+        return res.status(409).json({
+          success: false,
+          stale: true,
+          message: "Too late, the question changed"
+        });
+
+      default:
+        break;
     }
+
+    const isPlayer1 = participant === 1;
 
     return res.status(200).json({
       success: true,
-      correct,
-      score: myScore,
-      opponentAnswered,
-      nextQuestion: roundCompleted
+      correct: result.correct,
+      score: result.score,
+      isPlayer1,
+      player1Score: result.player1Score,
+      player2Score: result.player2Score,
+      player1Answered: result.player1Answered,
+      player2Answered: result.player2Answered,
+      answered: isPlayer1
+        ? result.player1Answered
+        : result.player2Answered,
+      opponentAnswered: isPlayer1
+        ? result.player2Answered
+        : result.player1Answered,
+      question: result.question,
+      nextQuestion: result.nextQuestion
     });
   } catch (err) {
     console.error("submitAnswer error:", err);
@@ -571,6 +497,10 @@ exports.submitAnswer = async (req, res) => {
     });
   }
 };
+
+/* ------------------------------------------------------------------ */
+/* Friend challenges                                                   */
+/* ------------------------------------------------------------------ */
 
 exports.challengeFriend = async (req, res) => {
   try {
@@ -641,9 +571,11 @@ exports.challengeFriend = async (req, res) => {
   } catch (err) {
     console.error("challengeFriend error:", err);
 
-    return res.status(500).json({
+    return res.status(err.statusCode || 500).json({
       success: false,
-      message: "Failed to create friend challenge"
+      message: err.statusCode
+        ? err.message
+        : "Failed to create friend challenge"
     });
   }
 };

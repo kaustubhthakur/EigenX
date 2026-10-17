@@ -20,7 +20,7 @@ app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 app.use(cors({
   origin: [
     "http://localhost:3000",
-    "http://192.168.0.101:3000",
+    "http://192.168.0.100:3000",
   ],
   credentials: true,
 }));

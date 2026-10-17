@@ -6,7 +6,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
 
-  allowedDevOrigins: ["192.168.0.101"],
+  allowedDevOrigins: [
+    "192.168.0.100",
+    "192.168.0.101",
+  ],
 
   turbopack: {
     root: path.join(__dirname),
