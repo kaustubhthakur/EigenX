@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getDuelQuestion, submitDuelAnswer } from "@/lib/api";
+import { isCorrectAnswer } from "@/lib/solveQuestion";
 import DuelScene from "@/components/DuelScene";
 
 type DuelResponse = {
@@ -157,6 +158,9 @@ export default function DuelPage() {
   const lastQuestionRef = useRef("");
   const gameOverRef = useRef(false);
   const pollInProgressRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Synchronous guard so auto-submit and Enter can never double fire.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -268,20 +272,18 @@ export default function DuelPage() {
     return () => window.clearInterval(interval);
   }, [duelId, pollQuestion]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    if (!answerInput.trim() || submitting || gameOver || answered) {
-      return;
+  // Put the cursor back in the answer box whenever a new question appears
+  // or the form comes back after an answer.
+  useEffect(() => {
+    if (!gameOver && !answered && question) {
+      inputRef.current?.focus();
     }
+  }, [question, answered, gameOver]);
 
-    const numericAnswer = Number(answerInput.trim());
+  const submitValue = async (numericAnswer: number) => {
+    if (submittingRef.current || gameOver || answered) return;
 
-    if (!Number.isFinite(numericAnswer)) {
-      setError("Enter a valid numeric answer.");
-      return;
-    }
-
+    submittingRef.current = true;
     const submittedQuestion = question;
 
     try {
@@ -330,8 +332,49 @@ export default function DuelPage() {
         setError(message);
       }
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
+      inputRef.current?.focus();
     }
+  };
+
+  // Auto-submit the moment the typed value equals the correct answer.
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setAnswerInput(value);
+
+    if (
+      submittingRef.current ||
+      gameOver ||
+      answered ||
+      value.trim() === ""
+    ) {
+      return;
+    }
+
+    const numeric = Number(value.trim());
+
+    if (isCorrectAnswer(question, numeric)) {
+      void submitValue(numeric);
+    }
+  };
+
+  // Enter / button is still available for submitting wrong answers.
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!answerInput.trim() || submitting || gameOver || answered) {
+      return;
+    }
+
+    const numericAnswer = Number(answerInput.trim());
+
+    if (!Number.isFinite(numericAnswer)) {
+      setError("Enter a valid numeric answer.");
+      return;
+    }
+
+    void submitValue(numericAnswer);
   };
 
   const ownScore = isPlayer1 === false ? player2Score : player1Score;
@@ -458,21 +501,27 @@ export default function DuelPage() {
                     onSubmit={handleSubmit}
                     className="mx-auto mt-2 flex max-w-sm flex-col gap-3"
                   >
+                    {/* readOnly (not disabled) while submitting, so the
+                        input never loses focus between questions */}
                     <input
+                      ref={inputRef}
                       type="number"
                       step="any"
                       inputMode="decimal"
                       value={answerInput}
-                      onChange={(event) => setAnswerInput(event.target.value)}
-                      disabled={submitting || gameOver}
+                      onChange={handleChange}
+                      readOnly={submitting}
+                      autoComplete="off"
                       placeholder="Your answer"
                       aria-label="Your answer"
-                      className="w-full rounded-xl border-0 bg-white/5 px-4 py-4 text-center text-2xl font-medium tabular-nums text-white placeholder:text-slate-500 ring-1 ring-inset ring-white/15 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                      className="w-full rounded-xl border-0 bg-white/5 px-4 py-4 text-center text-2xl font-medium tabular-nums text-white placeholder:text-slate-500 ring-1 ring-inset ring-white/15 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       autoFocus
                     />
 
                     <button
                       type="submit"
+                      // Keep focus in the input when the button is clicked/tapped
+                      onMouseDown={(e) => e.preventDefault()}
                       disabled={
                         submitting ||
                         answered ||
@@ -483,6 +532,10 @@ export default function DuelPage() {
                     >
                       {submitting ? "Submitting..." : "Submit answer"}
                     </button>
+
+                    <p className="text-xs text-slate-500">
+                      Correct answers submit automatically
+                    </p>
                   </form>
                 )}
 
