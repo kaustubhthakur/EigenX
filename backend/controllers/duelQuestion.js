@@ -259,5 +259,6 @@ function buildQuestion(settings) {
 module.exports = {
   ALLOWED_OPERATIONS,
   normalizeCustomSettings,
-  buildQuestion
+  buildQuestion,
+  canBuild
 };

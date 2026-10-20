@@ -1,52 +1,46 @@
-const ALLOWED_OPERATIONS = ["+", "-", "*", "/"];
-const MAX_DIGITS = 8;
-const MAX_TIMER = 600;
-const MAX_DECIMALS = 4;
+const { canBuild } = require("./questionGenerator");
 
-exports.validateCustomSettings = (input = {}) => {
-  const {
-    timer,
-    operations,
+const OPERATION_NAMES = {
+  "+": "addition",
+  "-": "subtraction",
+  "*": "multiplication",
+  "/": "division",
+};
+
+// ...keep everything above the final return unchanged...
+
+  const uniqueOps = [...new Set(operations)];
+
+  // canBuild expects camelCase settings
+  const probe = {
     leftMinDigits,
     leftMaxDigits,
     rightMinDigits,
     rightMaxDigits,
-    decimalPlaces = 0,
-  } = input;
-
-  const isInt = Number.isInteger;
-
-  if (!isInt(timer) || timer <= 15 || timer > MAX_TIMER) {
-    return { error: `Timer must be an integer greater than 15 (max ${MAX_TIMER}).` };
-  }
+    decimalPlaces,
+  };
 
   if (
-    !Array.isArray(operations) ||
-    operations.length === 0 ||
-    !operations.every((op) => ALLOWED_OPERATIONS.includes(op))
+    uniqueOps.includes("*") &&
+    leftMaxDigits + rightMaxDigits + decimalPlaces > 15
   ) {
-    return { error: "Choose at least one valid operation (+, -, *, /)." };
+    return {
+      error:
+        "Multiplication with this many digits is too large. Use fewer digits or decimal places.",
+    };
   }
 
-  const digitFields = { leftMinDigits, leftMaxDigits, rightMinDigits, rightMaxDigits };
-  for (const [name, value] of Object.entries(digitFields)) {
-    if (!isInt(value) || value < 2 || value > MAX_DIGITS) {
-      return { error: `${name} must be an integer between 2 and ${MAX_DIGITS}.` };
-    }
-  }
-
-  if (leftMaxDigits < leftMinDigits || rightMaxDigits < rightMinDigits) {
-    return { error: "Max digits cannot be less than min digits." };
-  }
-
-  if (!isInt(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > MAX_DECIMALS) {
-    return { error: `Decimal places must be between 0 and ${MAX_DECIMALS}.` };
+  const impossible = uniqueOps.find((op) => !canBuild(probe, op));
+  if (impossible) {
+    return {
+      error: `These digit settings can't make a ${OPERATION_NAMES[impossible]} question where the first number is larger than the second. Allow more digits for the first number or fewer for the second.`,
+    };
   }
 
   return {
     settings: {
       timer,
-      operations: [...new Set(operations)],
+      operations: uniqueOps,
       left_min_digits: leftMinDigits,
       left_max_digits: leftMaxDigits,
       right_min_digits: rightMinDigits,
@@ -54,4 +48,3 @@ exports.validateCustomSettings = (input = {}) => {
       decimal_places: decimalPlaces,
     },
   };
-};
