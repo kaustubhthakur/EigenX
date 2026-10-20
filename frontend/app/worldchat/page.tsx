@@ -88,6 +88,8 @@ export default function WorldChatPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const myId = user ? String(user.id) : "";
+  /** Your live level from the auth user, so your own messages never show a stale or wrong value. */
+  const myLevel = (user as { level?: number | string } | null)?.level;
 
   const [messages, setMessages] = useState<WorldMessage[]>([]);
   const [incoming, setIncoming] = useState<WorldDuelRequest[]>([]);
@@ -437,7 +439,7 @@ export default function WorldChatPage() {
                                 {formatTime(m.created_at)}
                               </time>
                               <span className="rounded-md bg-amber-400/10 px-1.5 py-px text-[11px] font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
-                                Lv {m.level}
+                                Lv {myLevel ?? m.level}
                               </span>
                               <span className="text-sm font-semibold text-indigo-300">You</span>
                             </div>
