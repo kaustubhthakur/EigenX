@@ -3,9 +3,7 @@ const MAX_DIGITS = 8;
 const MAX_TIMER = 600;
 const MAX_DECIMALS = 4;
 
-// JavaScript integers are exact only up to about 9e15. A product of an
-// N-digit and an M-digit number has at most N + M digits, so keeping
-// N + M at 15 or less keeps the stored answer exact.
+
 const MAX_PRODUCT_DIGITS = 15;
 
 exports.validateCustomSettings = (input = {}) => {
@@ -50,7 +48,7 @@ exports.validateCustomSettings = (input = {}) => {
 
   const uniqueOps = [...new Set(operations)];
 
-  // Prevent answers that are too large to store exactly
+  
   if (uniqueOps.includes("*") && leftMaxDigits + rightMaxDigits > MAX_PRODUCT_DIGITS) {
     return {
       error: "Multiplication with this many digits is too large. Use fewer digits.",

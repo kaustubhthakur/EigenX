@@ -15,16 +15,16 @@ const {
   cancelDuelRequest,
 } = require("../controllers/worldchat");
 
-// Messages
+
 router.get("/messages", verifyToken, getMessages);
 router.post("/messages", verifyToken, postMessage);
 router.delete("/messages/:id", verifyToken, deleteMessage);
 
-// People
+
 router.get("/online", verifyToken, getOnlineUsers);
 router.get("/users/:id", verifyToken, getProfile);
 
-// Duel requests
+
 router.post("/duels", verifyToken, sendDuelRequest);
 router.get("/duels/incoming", verifyToken, getIncoming);
 router.get("/duels/outgoing", verifyToken, getOutgoing);

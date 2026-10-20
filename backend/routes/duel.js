@@ -32,7 +32,7 @@ router.delete("/challenges/:challengeId", verifyToken, cancelChallenge);
 
 router.get("/question/:duelId", verifyToken, getQuestion);
 
-// Add this route:
+
 router.get("/:duelId", verifyToken, getDuelById);
 
 router.post("/answer", verifyToken, submitAnswer);
