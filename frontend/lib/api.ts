@@ -379,6 +379,22 @@ export function submitAnswer(
   });
 }
 
+export interface LevelStat {
+  /** "1", "2", "3", or "custom" for the Unknown level */
+  level: string;
+  best_score: number;
+  games_played: number;
+}
+
+export interface LevelStatsResponse {
+  success: boolean;
+  levels: LevelStat[];
+}
+
+export function getLevelStats(): Promise<LevelStatsResponse> {
+  return request<LevelStatsResponse>(GAME_API_URL, "/level-stats");
+}
+
 export interface LeaderboardEntry {
   rank: number;
   id: string;
