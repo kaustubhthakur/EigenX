@@ -21,13 +21,10 @@ const generateQuestion = (rule) => {
   let answer;
 
   switch (rule.operation) {
-
     case "+":
       left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
       right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
-
       answer = left + right;
-
       break;
 
     case "-":
@@ -39,39 +36,28 @@ const generateQuestion = (rule) => {
       }
 
       answer = left - right;
-
       break;
 
     case "*":
       left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
       right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
-
       answer = left * right;
-
       break;
 
     case "/":
-
       if (!rule.decimal_places) {
-
         right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
-
-        answer = Math.floor(Math.random() * 90) + 10;
-
-        left = answer * right;
-
-      } else {
-
-        left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
-
-        right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
-
-        answer = Number(
-          (left / right).toFixed(rule.decimal_places)
+        const leftTarget = randomNumberInRange(
+          rule.left_min_digits,
+          rule.left_max_digits
         );
-
+        answer = Math.max(2, Math.floor(leftTarget / right));
+        left = answer * right;
+      } else {
+        left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
+        right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
+        answer = Number((left / right).toFixed(rule.decimal_places));
       }
-
       break;
 
     default:
@@ -88,7 +74,6 @@ const generateQuestion = (rule) => {
 
 exports.getQuestion = async (req, res) => {
   try {
-
     const { sessionId } = req.params;
 
     const session = await Game.getGameSession(sessionId);
@@ -114,7 +99,6 @@ exports.getQuestion = async (req, res) => {
       });
     }
 
-    // Custom sessions carry their own settings; normal ones pass null
     const rule = await Game.getRandomArithmetic(
       session.level,
       session.custom_settings
@@ -139,9 +123,9 @@ exports.getQuestion = async (req, res) => {
       success: true,
       score: session.score,
       remainingTime: session.timer - elapsed,
-      question: arithmetic.question
+      question: arithmetic.question,
+      decimalPlaces: rule.decimal_places || 0
     });
-
   } catch (err) {
     return res.status(500).json({
       success: false,
@@ -149,6 +133,7 @@ exports.getQuestion = async (req, res) => {
     });
   }
 };
+
 exports.getMyLevelStats = async (req, res) => {
   try {
     const userId = req.user?.id ?? req.user?.userId ?? req.user?.sub;
@@ -161,10 +146,9 @@ exports.getMyLevelStats = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
 exports.submitAnswer = async (req, res) => {
-
   try {
-
     const { sessionId, answer } = req.body;
 
     const session = await Game.getGameSession(sessionId);
@@ -181,25 +165,17 @@ exports.submitAnswer = async (req, res) => {
     );
 
     if (elapsed >= session.timer) {
-
       await Game.finishGame(session.id);
-
-      await Game.updateTopScore(
-        session.user_id,
-        session.score
-      );
+      await Game.updateTopScore(session.user_id, session.score);
 
       return res.status(200).json({
         success: true,
         gameOver: true,
         score: session.score
       });
-
     }
 
-    const current = await Game.getCurrentQuestion(
-      session.id
-    );
+    const current = await Game.getCurrentQuestion(session.id);
 
     if (!current) {
       return res.status(409).json({
@@ -209,20 +185,12 @@ exports.submitAnswer = async (req, res) => {
     }
 
     let score = session.score;
-
     let correct = false;
 
     if (Number(answer) === Number(current.current_answer)) {
-
       score++;
-
       correct = true;
-
-      await Game.updateScore(
-        session.id,
-        score
-      );
-
+      await Game.updateScore(session.id, score);
     }
 
     return res.status(200).json({
@@ -231,14 +199,12 @@ exports.submitAnswer = async (req, res) => {
       score,
       nextQuestion: true
     });
-
   } catch (err) {
-
     return res.status(500).json({
       success: false,
       message: err.message
     });
-
   }
 };
+
 module.exports.generateQuestion = generateQuestion;
