@@ -683,23 +683,55 @@ function PodiumScene({
   );
 }
 
-function SummaryStrip({
-  items,
-}: {
-  items: { label: string; value: string; hint?: string; accent?: boolean }[];
-}) {
+
+function Icon({ d, className = "h-4 w-4" }: { d: string; className?: string }) {
   return (
-    <dl
-      className={`mb-6 grid grid-cols-2 divide-x divide-white/10 overflow-hidden sm:grid-cols-4 ${glass}`}
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
     >
-      {items.map((item, i) => (
-        <div
-          key={item.label}
-          className={`px-4 py-4 sm:px-5 ${i > 1 ? "border-t border-white/10 sm:border-t-0" : ""}`}
-        >
-          <dt className="text-xs font-medium text-slate-400">{item.label}</dt>
+      <path d={d} />
+    </svg>
+  );
+}
+
+const ICONS = {
+  rank: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4ZM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3",
+  score: "M12 3v3m0 12v3M3 12h3m12 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z",
+  chase: "M7 17 17 7M9 7h8v8",
+  level: "m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z",
+  users: "M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM21 20v-1a4 4 0 0 0-3-3.9M16 4.1a3.5 3.5 0 0 1 0 6.8",
+  search: "m21 21-4.3-4.3M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z",
+  refresh: "M20 11a8 8 0 0 0-14.9-3M4 5v4h4M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4",
+};
+
+type Stat = { label: string; value: string; hint?: string; icon: string; accent?: boolean };
+
+function StatCards({ items }: { items: Stat[] }) {
+  return (
+    <dl className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.label} className={`${glass} p-4 sm:p-5`}>
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-xs font-medium text-slate-400">{item.label}</dt>
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${
+                item.accent
+                  ? "bg-indigo-400/15 text-indigo-200 ring-indigo-300/30"
+                  : "bg-white/[0.05] text-slate-400 ring-white/10"
+              }`}
+            >
+              <Icon d={item.icon} />
+            </span>
+          </div>
           <dd
-            className={`${display.className} mt-1 truncate text-xl font-bold tabular-nums ${
+            className={`${display.className} mt-3 truncate text-2xl font-bold tabular-nums ${
               item.accent
                 ? "bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent"
                 : "text-white"
@@ -707,7 +739,7 @@ function SummaryStrip({
           >
             {item.value}
           </dd>
-          {item.hint && <p className="mt-0.5 text-xs text-slate-500">{item.hint}</p>}
+          {item.hint && <p className="mt-1 truncate text-xs text-slate-500">{item.hint}</p>}
         </div>
       ))}
     </dl>
@@ -718,15 +750,19 @@ function Skeleton() {
   return (
     <Shell>
       <div
-        className="mx-auto max-w-3xl animate-pulse px-4 py-12 sm:py-16"
+        className="mx-auto max-w-5xl animate-pulse px-4 py-10 sm:px-6 sm:py-14"
         aria-busy="true"
         aria-live="polite"
       >
-        <div className="mx-auto h-9 w-48 rounded-lg bg-white/10" />
-        <div className="mx-auto mt-3 h-4 w-64 rounded bg-white/10" />
-        <div className="mt-8 h-20 rounded-2xl bg-white/5 ring-1 ring-white/10" />
-        <div className="mt-6 h-[380px] rounded-2xl bg-white/[0.03] sm:h-[440px]" />
-        <div className="mt-8 space-y-px overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
+        <div className="h-9 w-48 rounded-lg bg-white/10" />
+        <div className="mt-3 h-4 w-64 rounded bg-white/10" />
+        <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[104px] rounded-2xl bg-white/5 ring-1 ring-white/10" />
+          ))}
+        </div>
+        <div className="mt-6 h-[420px] rounded-2xl bg-white/[0.03] ring-1 ring-white/10 sm:h-[480px]" />
+        <div className="mt-6 space-y-px overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-4 px-5 py-4">
               <div className="h-4 w-6 rounded bg-white/10" />
@@ -748,11 +784,17 @@ function Skeleton() {
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
+const cols =
+  "grid grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_6rem_9rem] items-center gap-3 sm:gap-4";
+
 export default function LeaderboardPage() {
   const { user } = useAuth();
   const [phase, setPhase] = useState<Phase>("loading");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "online">("all");
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -766,6 +808,19 @@ export default function LeaderboardPage() {
     }
   }, []);
 
+  /** Quiet refresh: keeps the page on screen instead of flashing the skeleton. */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const res = await getLeaderboard();
+      setEntries(res.leaderboard);
+    } catch {
+      /* keep what we have */
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
@@ -773,6 +828,16 @@ export default function LeaderboardPage() {
   const meId = user?.id != null ? String(user.id) : null;
   const podium = useMemo(() => entries.slice(0, 3), [entries]);
   const rest = useMemo(() => entries.slice(3), [entries]);
+
+  const onlineCount = useMemo(() => rest.filter((e) => e.is_online).length, [rest]);
+  const visibleRest = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rest.filter(
+      (e) =>
+        (filter === "all" || e.is_online) &&
+        (!q || (e.username || "").toLowerCase().includes(q))
+    );
+  }, [rest, query, filter]);
 
   const tiedRanks = useMemo(() => {
     const counts = new Map<number, number>();
@@ -811,40 +876,63 @@ export default function LeaderboardPage() {
     );
   }
 
-  const summary = [
+  const stats: Stat[] = [
     me
       ? {
           label: "Your rank",
           value: `${tiedRanks.has(me.rank) ? "T" : ""}#${me.rank}`,
           hint: `of ${entries.length} players`,
+          icon: ICONS.rank,
           accent: true,
         }
-      : { label: "Players", value: entries.length.toLocaleString("en-US"), hint: "ranked" },
+      : {
+          label: "Players",
+          value: entries.length.toLocaleString("en-US"),
+          hint: "ranked",
+          icon: ICONS.users,
+          accent: true,
+        },
     me
-      ? { label: "Your best score", value: formatScore(me.top_score) }
-      : { label: "Top score", value: formatScore(maxScore) },
+      ? { label: "Your best score", value: formatScore(me.top_score), hint: "all time", icon: ICONS.score }
+      : { label: "Top score", value: formatScore(maxScore), icon: ICONS.score },
     me
       ? myIndex === 0
-        ? { label: "Lead", value: "You're 1st", hint: "Keep it up" }
-        : { label: "To pass next", value: gap > 0 ? `${gap.toLocaleString("en-US")} pts` : "Tied", hint: "behind the player above" }
-      : { label: "Leader", value: entries[0]?.username ?? "—" },
+        ? { label: "Lead", value: "You’re 1st", hint: "Keep it up", icon: ICONS.chase }
+        : {
+            label: "To pass next",
+            value: gap > 0 ? `${gap.toLocaleString("en-US")} pts` : "Tied",
+            hint: "behind the player above",
+            icon: ICONS.chase,
+          }
+      : { label: "Leader", value: entries[0]?.username ?? "—", icon: ICONS.chase },
     me
-      ? { label: "Level", value: String(me.level), hint: `${me.xp.toLocaleString("en-US")} XP` }
-      : { label: "Podium", value: `${podium.length} of 3`, hint: "spots filled" },
+      ? { label: "Level", value: String(me.level), hint: `${me.xp.toLocaleString("en-US")} XP`, icon: ICONS.level }
+      : { label: "Podium", value: `${podium.length} of 3`, hint: "spots filled", icon: ICONS.level },
   ];
 
   return (
     <Shell>
-      <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            Leaderboard
-          </h1>
-          <p className="mt-3 text-base text-slate-400">
-            {entries.length > 0
-              ? `${entries.length.toLocaleString("en-US")} ${entries.length === 1 ? "player" : "players"} ranked by best score`
-              : "Rankings update as players finish games"}
-          </p>
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              Leaderboard
+            </h1>
+            <p className="mt-2 text-sm text-slate-400">
+              {entries.length > 0
+                ? `${entries.length.toLocaleString("en-US")} ${entries.length === 1 ? "player" : "players"} ranked by best score`
+                : "Rankings update as players finish games"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className={`inline-flex h-9 items-center gap-2 self-start rounded-lg bg-white/[0.05] px-3.5 text-sm font-medium text-slate-200 ring-1 ring-inset ring-white/10 transition hover:bg-white/10 disabled:opacity-60 sm:self-auto ${focusRing}`}
+          >
+            <Icon d={ICONS.refresh} className={`h-4 w-4 ${refreshing ? "motion-safe:animate-spin" : ""}`} />
+            {refreshing ? "Refreshing" : "Refresh"}
+          </button>
         </header>
 
         {entries.length === 0 ? (
@@ -854,92 +942,190 @@ export default function LeaderboardPage() {
           </div>
         ) : (
           <>
-            <SummaryStrip items={summary} />
+            <StatCards items={stats} />
 
-            <PodiumScene podium={podium} meId={meId} />
+            <section className={`${glass} relative mb-6 overflow-hidden`}>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_60%_at_50%_100%,rgba(99,102,241,0.18),transparent_70%)]"
+              />
+              <div className="relative flex items-center justify-between px-4 pt-4 sm:px-5">
+                <h2 className="text-sm font-semibold text-white">Top players</h2>
+                <span className="text-xs text-slate-500">Hover to tilt the podium</span>
+              </div>
+              <PodiumScene podium={podium} meId={meId} />
+            </section>
 
             {rest.length > 0 && (
-              <section className={`mt-8 overflow-hidden ${glass}`}>
-                <div className="flex items-center gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-slate-400 sm:gap-4 sm:px-5">
-                  <span className="w-10 shrink-0 text-center">Rank</span>
-                  <span className="flex-1">Player</span>
-                  <span>Best score</span>
-                </div>
-                <ol className="divide-y divide-white/5">
-                  {rest.map((entry) => {
-                    const mine = meId !== null && String(entry.id) === meId;
-                    const tied = tiedRanks.has(entry.rank);
-                    const pct = maxScore > 0 ? Math.max(2, ((entry.top_score || 0) / maxScore) * 100) : 0;
-                    return (
-                      <li
-                        key={entry.id}
-                        aria-current={mine ? "true" : undefined}
-                        className={`relative flex items-center gap-3 px-4 py-3 transition-colors sm:gap-4 sm:px-5 ${
-                          mine ? "bg-indigo-400/10" : "hover:bg-white/[0.04]"
-                        }`}
-                      >
-                        {mine && (
-                          <span className="absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b from-indigo-400 to-cyan-300" />
-                        )}
-
-                        <span
-                          className={`${display.className} flex w-10 shrink-0 items-center justify-center text-sm font-bold tabular-nums text-slate-400`}
-                          title={tied ? "Tied rank" : undefined}
+              <section className={`overflow-hidden ${glass}`}>
+                {/* Toolbar */}
+                <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                  <div>
+                    <h2 className="text-sm font-semibold text-white">All players</h2>
+                    <p className="text-xs text-slate-500">
+                      Ranked 4th and below · {rest.length.toLocaleString("en-US")}{" "}
+                      {rest.length === 1 ? "player" : "players"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      role="group"
+                      aria-label="Filter players"
+                      className="inline-flex rounded-lg bg-white/[0.05] p-0.5 ring-1 ring-inset ring-white/10"
+                    >
+                      {(
+                        [
+                          { id: "all", label: "All", count: rest.length },
+                          { id: "online", label: "Online", count: onlineCount },
+                        ] as const
+                      ).map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          aria-pressed={filter === t.id}
+                          onClick={() => setFilter(t.id)}
+                          className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                            filter === t.id
+                              ? "bg-white/10 text-white shadow-sm"
+                              : "text-slate-400 hover:text-slate-200"
+                          } ${focusRing}`}
                         >
-                          {tied ? (
-                            <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-xs text-slate-200">
-                              T{entry.rank}
-                            </span>
-                          ) : (
-                            entry.rank
+                          {t.id === "online" && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                           )}
-                        </span>
+                          {t.label}
+                          <span className="tabular-nums text-slate-500">{t.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="relative min-w-0 flex-1 sm:w-52 sm:flex-none">
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500">
+                        <Icon d={ICONS.search} />
+                      </span>
+                      <input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search players"
+                        aria-label="Search players"
+                        className="h-9 w-full rounded-lg bg-white/[0.05] pl-8 pr-3 text-sm text-white outline-none ring-1 ring-inset ring-white/10 transition placeholder:text-slate-500 focus:bg-white/[0.07] focus:ring-cyan-300/60"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                        <div className="relative shrink-0">
-                          <Avatar entry={entry} size="h-9 w-9" />
-                          {entry.is_online && (
-                            <span
-                              className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
-                              title="Online"
-                            />
-                          )}
-                        </div>
+                {/* Column headings */}
+                <div
+                  className={`${cols} border-b border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-slate-400 sm:px-5`}
+                >
+                  <span className="text-center">Rank</span>
+                  <span>Player</span>
+                  <span className="hidden sm:block">Level</span>
+                  <span className="hidden sm:block">XP</span>
+                  <span className="text-right">Best score</span>
+                </div>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="flex items-center gap-2 text-sm font-semibold text-white">
-                            <span className="truncate">{entry.username}</span>
-                            {mine && <YouBadge />}
-                          </p>
-                          <p className="mt-0.5 flex items-center gap-2 text-xs tabular-nums text-slate-500">
-                            <span>Level {entry.level}</span>
-                            <span className="h-0.5 w-0.5 rounded-full bg-slate-600" />
-                            <span>{entry.xp.toLocaleString("en-US")} XP</span>
-                          </p>
-                          {entry.top_score > 0 && (
-                            <div className="mt-2 h-1 w-full max-w-[200px] overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className={`h-full rounded-full ${
-                                  mine
-                                    ? "bg-gradient-to-r from-indigo-400 to-cyan-300"
-                                    : "bg-slate-500"
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        <span
-                          className={`${display.className} text-base font-bold tabular-nums ${
-                            entry.top_score > 0 ? "text-white" : "text-slate-600"
+                {visibleRest.length === 0 ? (
+                  <div className="px-6 py-14 text-center">
+                    <p className="text-sm font-semibold text-white">No players found</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Try a different name or switch the filter back to All.
+                    </p>
+                  </div>
+                ) : (
+                  <ol className="divide-y divide-white/5">
+                    {visibleRest.map((entry) => {
+                      const mine = meId !== null && String(entry.id) === meId;
+                      const tied = tiedRanks.has(entry.rank);
+                      const pct =
+                        maxScore > 0 ? Math.max(2, ((entry.top_score || 0) / maxScore) * 100) : 0;
+                      return (
+                        <li
+                          key={entry.id}
+                          aria-current={mine ? "true" : undefined}
+                          className={`relative px-4 py-3 transition-colors sm:px-5 ${cols} ${
+                            mine ? "bg-indigo-400/10" : "hover:bg-white/[0.04]"
                           }`}
                         >
-                          {formatScore(entry.top_score)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ol>
+                          {mine && (
+                            <span className="absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b from-indigo-400 to-cyan-300" />
+                          )}
+
+                          <span
+                            className={`${display.className} flex items-center justify-center text-sm font-bold tabular-nums text-slate-400`}
+                            title={tied ? "Tied rank" : undefined}
+                          >
+                            {tied ? (
+                              <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-xs text-slate-200">
+                                T{entry.rank}
+                              </span>
+                            ) : (
+                              entry.rank
+                            )}
+                          </span>
+
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="relative shrink-0">
+                              <Avatar entry={entry} size="h-9 w-9" />
+                              {entry.is_online && (
+                                <span
+                                  className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+                                  title="Online"
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                                <span className="truncate">{entry.username}</span>
+                                {mine && <YouBadge />}
+                              </p>
+                              <p className="mt-0.5 text-xs tabular-nums text-slate-500 sm:hidden">
+                                Level {entry.level} · {entry.xp.toLocaleString("en-US")} XP
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="hidden sm:block">
+                            <span className="inline-flex rounded-md bg-white/[0.06] px-2 py-0.5 text-xs font-medium tabular-nums text-slate-200 ring-1 ring-inset ring-white/10">
+                              Lv {entry.level}
+                            </span>
+                          </span>
+
+                          <span className="hidden text-sm tabular-nums text-slate-300 sm:block">
+                            {entry.xp.toLocaleString("en-US")}
+                          </span>
+
+                          <div className="text-right">
+                            <span
+                              className={`${display.className} text-base font-bold tabular-nums ${
+                                entry.top_score > 0 ? "text-white" : "text-slate-600"
+                              }`}
+                            >
+                              {formatScore(entry.top_score)}
+                            </span>
+                            {entry.top_score > 0 && (
+                              <div className="ml-auto mt-1.5 hidden h-1 w-full overflow-hidden rounded-full bg-white/10 sm:block">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    mine
+                                      ? "bg-gradient-to-r from-indigo-400 to-cyan-300"
+                                      : "bg-slate-500"
+                                  }`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+
+                <div className="border-t border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs text-slate-500 sm:px-5">
+                  Showing {visibleRest.length.toLocaleString("en-US")} of{" "}
+                  {rest.length.toLocaleString("en-US")}
+                </div>
               </section>
             )}
           </>
