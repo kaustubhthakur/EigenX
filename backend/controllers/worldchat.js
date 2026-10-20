@@ -21,13 +21,16 @@ const emitToUser = (req, userId, event, payload) => {
 };
 
 
+// World duels use a real configuration (level + timer), set in WORLD_DUEL_CONFIG.
 const createWorldDuel = async ({ senderId, receiverId }) => {
-  const duel = await duelModel.createDuel({
-    challengerId: senderId,
-    opponentId: receiverId,
-    ...worldChat.WORLD_DUEL_CONFIG,
-  });
+  const { level, timer } = worldChat.WORLD_DUEL_CONFIG;
+  const configurationId = await duelModel.findConfigurationId(level, timer);
 
+  if (!configurationId) {
+    throw new Error(`No game configuration found for level ${level} at ${timer}s`);
+  }
+
+  const duel = await duelModel.createDuel(senderId, receiverId, configurationId);
   return duel.id;
 };
 
@@ -217,10 +220,17 @@ exports.acceptDuelRequest = async (req, res) => {
       return explainUnavailable(res, requestId);
     }
 
-    const duelId = await createWorldDuel({
-      senderId: accepted.sender_id,
-      receiverId: accepted.receiver_id,
-    });
+    let duelId;
+    try {
+      duelId = await createWorldDuel({
+        senderId: accepted.sender_id,
+        receiverId: accepted.receiver_id,
+      });
+    } catch (err) {
+      // Don't leave the request stuck as "accepted" with no duel behind it.
+      await worldChat.revertAcceptedRequest({ requestId }).catch(() => {});
+      throw err;
+    }
     await worldChat.attachDuel({ requestId, duelId });
 
     const payload = { requestId, duelId };

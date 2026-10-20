@@ -5,10 +5,11 @@ const MAX_MESSAGE_LENGTH = 500;
 const REQUEST_TTL_SECONDS = 60;
 
 
+// World duels use a real row from the `configurations` table (level + timer),
+// the same as friend challenges and matchmaking.
 exports.WORLD_DUEL_CONFIG = Object.freeze({
-  rounds: 10,
-  timePerQuestionSeconds: 15,
-  difficulty: "medium",
+  level: 2,
+  timer: 60,
 });
 
 
@@ -276,6 +277,23 @@ exports.attachDuel = async ({ requestId, duelId }) => {
     RETURNING id, duel_id
     `,
     [requestId, duelId]
+  );
+
+  return result.rows[0];
+};
+
+/** Undo an accept when the duel could not be created, so the request is not left stuck. */
+exports.revertAcceptedRequest = async ({ requestId }) => {
+  const result = await pool.query(
+    `
+    UPDATE world_duel_requests
+    SET status = 'cancelled', responded_at = NOW()
+    WHERE id = $1
+      AND status = 'accepted'
+      AND duel_id IS NULL
+    RETURNING id, sender_id, receiver_id, status
+    `,
+    [requestId]
   );
 
   return result.rows[0];

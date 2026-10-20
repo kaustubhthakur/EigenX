@@ -606,6 +606,36 @@ exports.createDuel = async (
   return result.rows[0];
 };
 
+exports.findConfigurationId = async (level, timer) => {
+  const exact = await pool.query(
+    `
+    SELECT id
+    FROM configurations
+    WHERE level = $1
+      AND timer = $2
+      AND is_custom IS NOT TRUE
+    ORDER BY id
+    LIMIT 1
+    `,
+    [level, timer]
+  );
+  if (exact.rows[0]) return exact.rows[0].id;
+
+  // Fallback: any standard configuration for that level
+  const fallback = await pool.query(
+    `
+    SELECT id
+    FROM configurations
+    WHERE level = $1
+      AND is_custom IS NOT TRUE
+    ORDER BY timer, id
+    LIMIT 1
+    `,
+    [level]
+  );
+  return fallback.rows[0]?.id ?? null;
+};
+
 exports.createChallenge = async (
   challengerId,
   challengedId,
