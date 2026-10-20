@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getQuestion, submitAnswer } from "../../../lib/api";
+import { isCorrectAnswer } from "../../../lib/solveQuestion";
 import DuelScene from "../../../components/DuelScene";
 
 const CountdownOrb = dynamic(() => import("../../../components/CountdownOrb"), {
@@ -42,6 +43,8 @@ export default function GameSessionPage({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Synchronous guard so auto-submit and manual submit can never double fire.
+  const submittingRef = useRef(false);
 
   const loadNextQuestion = async () => {
     try {
@@ -68,7 +71,6 @@ export default function GameSessionPage({
       );
       setPhase("playing");
       setAnswer("");
-      inputRef.current?.focus();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to load question");
       setPhase("error");
@@ -79,6 +81,11 @@ export default function GameSessionPage({
     loadNextQuestion();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // Always put the cursor back in the answer box whenever a new question shows up.
+  useEffect(() => {
+    if (phase === "playing") inputRef.current?.focus();
+  }, [phase, question]);
 
   useEffect(() => {
     if (phase !== "playing" || remainingTime == null) return;
@@ -97,13 +104,13 @@ export default function GameSessionPage({
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!answer.trim() || submitting) return;
-
+  const submitValue = async (value: number) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
+
     try {
-      const res = await submitAnswer(sessionId, Number(answer));
+      const res = await submitAnswer(sessionId, value);
       setScore(res.score);
 
       if (res.gameOver) {
@@ -120,8 +127,30 @@ export default function GameSessionPage({
       setErrorMsg(err instanceof Error ? err.message : "Failed to submit answer");
       setPhase("error");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
+      inputRef.current?.focus();
     }
+  };
+
+  // Auto-submit the moment the typed value equals the correct answer.
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAnswer(value);
+
+    if (phase !== "playing" || submittingRef.current || value.trim() === "") return;
+
+    const num = Number(value);
+    if (isCorrectAnswer(question, num)) {
+      void submitValue(num);
+    }
+  };
+
+  // Manual submit (Enter / button) is still available for wrong answers.
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!answer.trim()) return;
+    void submitValue(Number(answer));
   };
 
   if (phase === "loading") {
@@ -245,24 +274,28 @@ export default function GameSessionPage({
           <input
             ref={inputRef}
             type="number"
-            inputMode="numeric"
+            inputMode="decimal"
+            step="any"
             value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
+            onChange={handleChange}
             placeholder="Type your answer"
             aria-label="Your answer"
+            autoComplete="off"
             autoFocus
             className="h-12 min-w-0 flex-1 rounded-xl border-0 bg-white/5 px-4 text-center text-lg font-semibold tabular-nums text-white ring-1 ring-inset ring-white/15 transition placeholder:text-base placeholder:font-normal placeholder:text-slate-500 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             type="submit"
+            // Keep focus in the input when the button is clicked/tapped.
+            onMouseDown={(e) => e.preventDefault()}
             disabled={submitting || !answer.trim()}
             className={`h-12 rounded-xl px-6 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${primaryButton}`}
           >
             {submitting ? "Checking…" : "Submit"}
           </button>
         </form>
-        <p className="mt-3 hidden text-center text-xs text-slate-500 sm:block">
-          Press Enter to submit
+        <p className="mt-3 text-center text-xs text-slate-500">
+          Correct answers submit automatically
         </p>
       </div>
     </Shell>

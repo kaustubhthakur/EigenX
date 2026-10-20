@@ -11,3 +11,11 @@ export function solveQuestion(q: string): number | null {
     default: return null;
   }
 }
+
+
+export function isCorrectAnswer(question: string | null, value: number): boolean {
+  if (!question || !Number.isFinite(value)) return false;
+  const expected = solveQuestion(question);
+  if (expected == null) return false;
+  return Math.abs(value - expected) <= 1e-9 * Math.max(1, Math.abs(expected));
+}
