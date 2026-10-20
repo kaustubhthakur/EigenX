@@ -8,29 +8,24 @@ import { getProfile, updateProfile } from "../../lib/api";
 import type { UserProfile } from "../../types/user";
 import AvatarUpload from "../../components/AvatarUpload";
 import FriendsPanel from "../../components/FriendsPanel";
-import DuelScene from "../../components/DuelScene";
 
 const XP_PER_LEVEL = 500;
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
 
-const card =
-  "rounded-2xl bg-slate-900/70 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+const card = "rounded-xl border border-slate-800 bg-slate-900";
 
-const primaryButton = `bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 disabled:opacity-60 ${focusRing}`;
+const primaryButton = `bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`;
 
-const ghostButton = `bg-white/5 text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 disabled:opacity-60 ${focusRing}`;
+const secondaryButton = `border border-slate-700 bg-transparent text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`;
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] text-slate-100">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_20%,rgba(99,102,241,0.18),transparent)]"
-      />
-      <DuelScene focus="center" calm />
-      <div className="relative z-10">{children}</div>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:py-12">
+        {children}
+      </div>
     </div>
   );
 }
@@ -38,17 +33,18 @@ function Shell({ children }: { children: ReactNode }) {
 function ProfileSkeleton() {
   return (
     <Shell>
-      <div className="mx-auto max-w-2xl animate-pulse px-4 py-10 sm:px-6" aria-busy="true">
-        <div className="mb-6 h-8 w-40 rounded bg-white/10" />
-        <div className={`${card} p-6`}>
-          <div className="flex items-center gap-5">
-            <div className="h-20 w-20 rounded-full bg-white/10" />
-            <div className="space-y-2">
-              <div className="h-4 w-32 rounded bg-white/10" />
-              <div className="h-3 w-44 rounded bg-white/10" />
-            </div>
+      <div className="animate-pulse" aria-busy="true">
+        <div className="h-7 w-32 rounded bg-slate-800" />
+        <div className="mt-2 h-4 w-64 rounded bg-slate-800/70" />
+        <div className="mt-8 grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <div className={`${card} h-64`} />
+            <div className={`${card} h-48`} />
           </div>
-          <div className="mt-6 h-16 rounded-xl bg-white/5" />
+          <div className="space-y-6">
+            <div className={`${card} h-40`} />
+            <div className={`${card} h-32`} />
+          </div>
         </div>
       </div>
     </Shell>
@@ -57,9 +53,28 @@ function ProfileSkeleton() {
 
 function Stat({ value, label }: { value: number | string; label: string }) {
   return (
-    <div className="px-4 py-4 text-center">
+    <div className="px-4 py-4">
       <p className="text-2xl font-semibold tabular-nums text-white">{value}</p>
       <p className="mt-0.5 text-xs text-slate-400">{label}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid gap-1.5 py-4 sm:grid-cols-3 sm:items-center sm:gap-4">
+      <label htmlFor={htmlFor} className="text-sm font-medium text-slate-400">
+        {label}
+      </label>
+      <div className="min-w-0 text-sm text-slate-100 sm:col-span-2">{children}</div>
     </div>
   );
 }
@@ -100,6 +115,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyUserUpdate = (u: UserProfile) => {
@@ -129,18 +145,25 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCancel = () => {
+    if (!profile) return;
+    setEditing(false);
+    setUsername(profile.username);
+    setFormError(null);
+  };
+
   if (loading) return <ProfileSkeleton />;
 
   if (!profile) {
     return (
       <Shell>
-        <div className="mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center px-4 py-16 text-center">
+        <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center text-center">
           <p className="mb-4 text-sm font-medium text-red-300">
             {loadError || "Unable to load your profile."}
           </p>
           <button
             onClick={loadProfile}
-            className={`rounded-lg px-5 py-2.5 text-sm font-semibold ${primaryButton}`}
+            className={`rounded-lg px-4 py-2 text-sm font-medium ${primaryButton}`}
           >
             Try again
           </button>
@@ -150,116 +173,143 @@ export default function DashboardPage() {
   }
 
   const xpIntoLevel = profile.xp % XP_PER_LEVEL;
+  const xpRemaining = XP_PER_LEVEL - xpIntoLevel;
   const xpProgressPct = Math.min(100, Math.round((xpIntoLevel / XP_PER_LEVEL) * 100));
 
   return (
     <Shell>
-      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">Profile</h1>
+      {/* Page header */}
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight text-white">Profile</h1>
+        <p className="mt-1 text-sm text-slate-400">
+          Manage your account details and track your progress.
+        </p>
+      </header>
 
-          {!editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className={`rounded-lg px-3.5 py-2 text-sm font-semibold ${ghostButton}`}
+      {(success || formError) && (
+        <div className="mt-6">
+          {success && (
+            <div
+              role="status"
+              className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200"
             >
-              Edit profile
-            </button>
+              {success}
+            </div>
+          )}
+          {formError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200"
+            >
+              {formError}
+            </div>
           )}
         </div>
+      )}
 
-        {success && (
-          <div
-            role="status"
-            className="mb-4 rounded-xl bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-200 ring-1 ring-emerald-400/30"
-          >
-            {success}
-          </div>
-        )}
-        {formError && (
-          <div
-            role="alert"
-            className="mb-4 rounded-xl bg-red-500/10 px-4 py-2.5 text-sm font-medium text-red-200 ring-1 ring-red-400/30"
-          >
-            {formError}
-          </div>
-        )}
+      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+        {/* ----------------------------- Main column ----------------------------- */}
+        <div className="space-y-6 lg:col-span-2">
+          <section className={card} aria-labelledby="account-heading">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+              <div>
+                <h2 id="account-heading" className="text-base font-semibold text-white">
+                  Account
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-400">Your public profile information.</p>
+              </div>
 
-        <section className={card} aria-label="Your profile">
-          {/* Identity */}
-          <div className="flex flex-col items-center gap-5 p-6 sm:flex-row sm:items-start">
-            <div className="shrink-0">
-              <AvatarUpload
-                currentAvatar={profile.avatar}
-                username={profile.username}
-                onUploaded={applyUserUpdate}
-              />
+              {!editing && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${secondaryButton}`}
+                >
+                  Edit
+                </button>
+              )}
             </div>
 
-            <div className="min-w-0 flex-1 text-center sm:pt-2 sm:text-left">
-              {editing ? (
-                <>
-                  <input
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    aria-label="Username"
-                    placeholder="Username"
-                    className="w-full rounded-lg border-0 bg-white/5 px-3 py-2 text-base font-semibold text-white ring-1 ring-inset ring-white/15 placeholder:text-slate-500 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
-                  />
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold ${primaryButton}`}
-                    >
-                      {saving ? "Saving..." : "Save changes"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditing(false);
-                        setUsername(profile.username);
-                        setFormError(null);
-                      }}
-                      disabled={saving}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium ${ghostButton}`}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <p className="truncate text-xl font-semibold text-white">{profile.username}</p>
-                  <span className="rounded-full bg-indigo-400/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-200 ring-1 ring-inset ring-indigo-300/30">
+            <div className="px-6">
+              <div className="flex items-center gap-5 border-b border-slate-800 py-5">
+                <AvatarUpload
+                  currentAvatar={profile.avatar}
+                  username={profile.username}
+                  onUploaded={applyUserUpdate}
+                />
+              </div>
+
+              <div className="divide-y divide-slate-800">
+                <Field label="Username" htmlFor="username">
+                  {editing ? (
+                    <input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Username"
+                      autoComplete="username"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white placeholder:text-slate-500 [color-scheme:dark] focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30"
+                    />
+                  ) : (
+                    <span className="truncate font-medium">{profile.username}</span>
+                  )}
+                </Field>
+
+                <Field label="Email">
+                  <span className="truncate text-slate-300">{profile.email}</span>
+                </Field>
+
+                <Field label="Level">
+                  <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-medium text-indigo-300 ring-1 ring-inset ring-indigo-400/20">
                     Level {profile.level}
                   </span>
-                </div>
-              )}
-              {!editing && (
-                <p className="mt-1 truncate text-sm text-slate-400">{profile.email}</p>
-              )}
+                </Field>
+              </div>
             </div>
-          </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 divide-x divide-white/10 border-t border-white/10">
-            <Stat value={profile.level} label="Level" />
-            <Stat value={profile.xp} label="Total XP" />
-            <Stat value={profile.top_score ?? 0} label="Highest score" />
-          </div>
+            {editing && (
+              <div className="flex justify-end gap-2 border-t border-slate-800 bg-slate-900/60 px-6 py-4">
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium ${secondaryButton}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium ${primaryButton}`}
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            )}
+          </section>
 
-          {/* Progress */}
-          <div className="border-t border-white/10 p-6">
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <span className="font-medium text-slate-300">
-                Progress to level {profile.level + 1}
-              </span>
-              <span className="tabular-nums text-slate-400">
-                {xpIntoLevel} / {XP_PER_LEVEL} XP
-              </span>
+          <FriendsPanel currentUserId={profile.id} />
+        </div>
+
+        {/* ------------------------------ Sidebar ------------------------------ */}
+        <aside className="space-y-6 self-start">
+          <section className={card} aria-label="Statistics">
+            <div className="border-b border-slate-800 px-6 py-4">
+              <h2 className="text-base font-semibold text-white">Statistics</h2>
             </div>
+            <div className="grid grid-cols-3 divide-x divide-slate-800 px-2 lg:grid-cols-1 lg:divide-x-0 lg:divide-y lg:px-0">
+              <Stat value={profile.level} label="Level" />
+              <Stat value={profile.xp} label="Total XP" />
+              <Stat value={profile.top_score ?? 0} label="Highest score" />
+            </div>
+          </section>
+
+          <section className={`${card} p-6`} aria-label="Level progress">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-base font-semibold text-white">Level progress</h2>
+              <span className="text-xs tabular-nums text-slate-400">{xpProgressPct}%</span>
+            </div>
+
             <div
-              className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+              className="mt-4 h-2 w-full overflow-hidden rounded-full bg-slate-800"
               role="progressbar"
               aria-valuenow={xpProgressPct}
               aria-valuemin={0}
@@ -267,16 +317,21 @@ export default function DashboardPage() {
               aria-label="XP progress to next level"
             >
               <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-cyan-300 transition-all duration-500"
+                className="h-full rounded-full bg-indigo-500 transition-all duration-500"
                 style={{ width: `${xpProgressPct}%` }}
               />
             </div>
-          </div>
-        </section>
 
-        <div className="mt-6">
-          <FriendsPanel currentUserId={profile.id} />
-        </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+              <span className="tabular-nums">
+                {xpIntoLevel} / {XP_PER_LEVEL} XP
+              </span>
+              <span>
+                {xpRemaining} XP to level {profile.level + 1}
+              </span>
+            </div>
+          </section>
+        </aside>
       </div>
     </Shell>
   );
