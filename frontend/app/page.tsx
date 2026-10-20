@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Clock, Play, SlidersHorizontal } from "lucide-react";
+import { Clock, Play, SlidersHorizontal, Trophy, User, Users } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import DuelScene from "../components/DuelScene";
 import {
   getConfigurations,
   startGame,
@@ -34,12 +33,33 @@ const DEFAULT_CUSTOM: CustomSettings = {
   decimalPlaces: 0,
 };
 
+const FEATURES = [
+  {
+    href: "/leaderboard",
+    icon: Trophy,
+    title: "Leaderboard",
+    text: "See how your best scores rank against other players.",
+  },
+  {
+    href: "/duel",
+    icon: Users,
+    title: "Duels",
+    text: "Race a friend or a random opponent on the same questions.",
+  },
+  {
+    href: "/dashboard",
+    icon: User,
+    title: "Your profile",
+    text: "Track your level, XP and highest score over time.",
+  },
+];
+
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
 
-const primaryButton = `bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`;
+const primaryButton = `bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500 ${focusRing}`;
 
-const ghostButton = `bg-white/5 text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 ${focusRing}`;
+const secondaryButton = `border border-slate-700 bg-transparent text-slate-200 transition hover:bg-slate-800 ${focusRing}`;
 
 function validateCustom(s: CustomSettings): string | null {
   if (!Number.isInteger(s.timer) || s.timer < MIN_CUSTOM_TIMER || s.timer > MAX_CUSTOM_TIMER) {
@@ -141,21 +161,27 @@ export default function HomePage() {
   };
 
   const chipClass = (active: boolean) =>
-    `rounded-lg px-4 py-2 text-sm font-medium transition ${focusRing} ${
+    `rounded-lg border px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
       active
-        ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.5)]"
-        : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10 hover:text-white"
+        ? "border-indigo-500 bg-indigo-500/10 text-white"
+        : "border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
     }`;
 
   const fieldClass =
-    "w-full rounded-lg border-0 bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-inset ring-white/10 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300";
+    "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white [color-scheme:dark] focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30";
 
-  const labelClass = "mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400";
+  const labelClass = "mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-300";
 
   const startDisabled =
     starting ||
     selectedLevel == null ||
     (isCustomSelected ? customError !== null : selectedTimer == null);
+
+  const summary = isCustomSelected
+    ? `Custom \u00b7 ${Number.isNaN(custom.timer) ? "-" : custom.timer}s`
+    : selectedLevel != null && selectedTimer != null
+      ? `Level ${selectedLevel} \u00b7 ${selectedTimer}s`
+      : "Choose your settings";
 
   const digitSelect = (
     label: string,
@@ -163,222 +189,242 @@ export default function HomePage() {
     onChange: (v: number) => void,
     options: number[]
   ) => (
-    <div>
-      <label className="mb-1 block text-xs text-slate-400">
-        {label}
-        <select
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className={`${fieldClass} mt-1`}
-        >
-          {options.map((d) => (
-            <option key={d} value={d} className="bg-slate-900">
-              {d}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+    <label className="block text-xs font-medium text-slate-400">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={`${fieldClass} mt-1.5`}
+      >
+        {options.map((d) => (
+          <option key={d} value={d} className="bg-slate-900">
+            {d}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 
   return (
-    <main className="relative isolate flex min-h-[calc(100vh-64px)] items-center overflow-hidden bg-[#070815] px-4 py-16 text-slate-100 sm:px-6">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_30%,rgba(99,102,241,0.22),transparent),radial-gradient(45%_40%_at_10%_90%,rgba(34,211,238,0.12),transparent)]"
-      />
-      <DuelScene focus="side" />
-
-      <div className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-12 lg:grid-cols-2">
+    <main className="min-h-[calc(100vh-64px)] bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 sm:py-16">
+      <div className="mx-auto w-full max-w-3xl">
         {/* Hero */}
-        <div className="text-center lg:text-left">
-          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+        <header className="text-center">
+          <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
+            Mental math training
+          </span>
+          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             Mental math, at speed.
           </h1>
-          <p className="mx-auto mt-4 max-w-md text-base leading-7 text-slate-400 lg:mx-0">
+          <p className="mx-auto mt-4 max-w-md text-base leading-7 text-slate-400">
             Pick a level and a timer, then answer as fast as you can. Climb the
             leaderboard or challenge a friend to a duel.
           </p>
 
           {!authLoading && !user && (
-            <div className="mt-7 flex justify-center gap-3 lg:justify-start">
+            <div className="mt-6 flex justify-center gap-3">
               <Link
                 href="/register"
-                className={`rounded-lg px-5 py-2.5 text-sm font-semibold ${primaryButton}`}
+                className={`rounded-lg px-4 py-2 text-sm font-medium ${primaryButton}`}
               >
                 Get started
               </Link>
               <Link
                 href="/login"
-                className={`rounded-lg px-5 py-2.5 text-sm font-medium ${ghostButton}`}
+                className={`rounded-lg px-4 py-2 text-sm font-medium ${secondaryButton}`}
               >
                 Log in
               </Link>
             </div>
           )}
-        </div>
+        </header>
 
         {/* Start a game */}
-        <div className="w-full rounded-2xl bg-slate-900/60 p-7 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-xl">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Start a game</h2>
-            <p className="mt-1 text-sm text-slate-400">
+        <section
+          aria-labelledby="start-heading"
+          className="mx-auto mt-10 max-w-xl rounded-xl border border-slate-800 bg-slate-900"
+        >
+          <div className="border-b border-slate-800 px-6 py-4">
+            <h2 id="start-heading" className="text-base font-semibold text-white">
+              Start a game
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-400">
               {isCustomSelected
                 ? "Set your own arithmetic and timer."
                 : "Choose a level and a timer to begin."}
             </p>
           </div>
 
-          {error && (
-            <div
-              role="alert"
-              className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-xs font-medium text-red-200 ring-1 ring-red-400/30"
-            >
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6">
-            <p className={labelClass}>Level</p>
-            <div className="flex flex-wrap gap-2">
-              {levels.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  aria-pressed={selectedLevel === level}
-                  onClick={() => {
-                    setSelectedLevel(level);
-                    setError(null);
-                  }}
-                  className={`${chipClass(selectedLevel === level)} ${
-                    level === customLevel ? "flex items-center gap-1.5" : ""
-                  }`}
-                >
-                  {level === customLevel ? (
-                    <>
-                      <SlidersHorizontal className="h-3.5 w-3.5" /> Unknown
-                    </>
-                  ) : (
-                    `Level ${level}`
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isCustomSelected ? (
-            <>
-              {/* Timer */}
-              <div className="mt-5">
-                <label className={labelClass} htmlFor="custom-timer">
-                  <Clock className="h-3.5 w-3.5" /> Timer (seconds)
-                </label>
-                <input
-                  id="custom-timer"
-                  type="number"
-                  min={MIN_CUSTOM_TIMER}
-                  max={MAX_CUSTOM_TIMER}
-                  value={Number.isNaN(custom.timer) ? "" : custom.timer}
-                  onChange={(e) =>
-                    updateCustom({ timer: e.target.value === "" ? NaN : Number(e.target.value) })
-                  }
-                  className={fieldClass}
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  Must be more than 15 seconds (max {MAX_CUSTOM_TIMER}).
-                </p>
+          <div className="px-6 py-5">
+            {error && (
+              <div
+                role="alert"
+                className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+              >
+                {error}
               </div>
+            )}
 
-              {/* Operations */}
-              <div className="mt-5">
-                <p className={labelClass}>Operations</p>
-                <div className="flex flex-wrap gap-2">
-                  {OPERATIONS.map(({ symbol, label }) => (
-                    <button
-                      key={symbol}
-                      type="button"
-                      aria-pressed={custom.operations.includes(symbol)}
-                      onClick={() => toggleOperation(symbol)}
-                      className={chipClass(custom.operations.includes(symbol))}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Digits */}
-              <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-3">
-                {digitSelect("Left min digits", custom.leftMinDigits, setLeftMin, DIGIT_OPTIONS)}
-                {digitSelect(
-                  "Left max digits",
-                  custom.leftMaxDigits,
-                  (v) => updateCustom({ leftMaxDigits: v }),
-                  DIGIT_OPTIONS.filter((d) => d >= custom.leftMinDigits)
-                )}
-                {digitSelect("Right min digits", custom.rightMinDigits, setRightMin, DIGIT_OPTIONS)}
-                {digitSelect(
-                  "Right max digits",
-                  custom.rightMaxDigits,
-                  (v) => updateCustom({ rightMaxDigits: v }),
-                  DIGIT_OPTIONS.filter((d) => d >= custom.rightMinDigits)
-                )}
-              </div>
-
-              {/* Decimals */}
-              <div className="mt-3">
-                {digitSelect(
-                  "Decimal places",
-                  custom.decimalPlaces,
-                  (v) => updateCustom({ decimalPlaces: v }),
-                  [0, 1, 2, 3, 4]
-                )}
-              </div>
-
-              {customError && (
-                <p role="alert" className="mt-3 text-xs font-medium text-red-300">
-                  {customError}
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="mt-5">
-              <p className={labelClass}>
-                <Clock className="h-3.5 w-3.5" /> Timer
-              </p>
+            <div>
+              <p className={labelClass}>Level</p>
               <div className="flex flex-wrap gap-2">
-                {timersForLevel.map((timer) => (
+                {levels.map((level) => (
                   <button
-                    key={timer}
+                    key={level}
                     type="button"
-                    aria-pressed={selectedTimer === timer}
-                    onClick={() => setSelectedTimer(timer)}
-                    className={chipClass(selectedTimer === timer)}
+                    aria-pressed={selectedLevel === level}
+                    onClick={() => {
+                      setSelectedLevel(level);
+                      setError(null);
+                    }}
+                    className={`${chipClass(selectedLevel === level)} ${
+                      level === customLevel ? "flex items-center gap-1.5" : ""
+                    }`}
                   >
-                    {timer}s
+                    {level === customLevel ? (
+                      <>
+                        <SlidersHorizontal className="h-3.5 w-3.5" /> Custom
+                      </>
+                    ) : (
+                      `Level ${level}`
+                    )}
                   </button>
                 ))}
               </div>
             </div>
-          )}
 
-          <button
-            type="button"
-            onClick={handleStart}
-            disabled={startDisabled}
-            className={`mt-7 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${primaryButton}`}
-          >
-            {starting ? (
-              "Starting..."
-            ) : user ? (
+            {isCustomSelected ? (
               <>
-                <Play className="h-4 w-4" /> Start game
+                <div className="mt-6">
+                  <label className={labelClass} htmlFor="custom-timer">
+                    <Clock className="h-3.5 w-3.5" /> Timer (seconds)
+                  </label>
+                  <input
+                    id="custom-timer"
+                    type="number"
+                    min={MIN_CUSTOM_TIMER}
+                    max={MAX_CUSTOM_TIMER}
+                    value={Number.isNaN(custom.timer) ? "" : custom.timer}
+                    onChange={(e) =>
+                      updateCustom({ timer: e.target.value === "" ? NaN : Number(e.target.value) })
+                    }
+                    className={fieldClass}
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    Must be more than 15 seconds (max {MAX_CUSTOM_TIMER}).
+                  </p>
+                </div>
+
+                <div className="mt-6">
+                  <p className={labelClass}>Operations</p>
+                  <div className="flex flex-wrap gap-2">
+                    {OPERATIONS.map(({ symbol, label }) => (
+                      <button
+                        key={symbol}
+                        type="button"
+                        aria-pressed={custom.operations.includes(symbol)}
+                        onClick={() => toggleOperation(symbol)}
+                        className={chipClass(custom.operations.includes(symbol))}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-4">
+                  {digitSelect("Left min digits", custom.leftMinDigits, setLeftMin, DIGIT_OPTIONS)}
+                  {digitSelect(
+                    "Left max digits",
+                    custom.leftMaxDigits,
+                    (v) => updateCustom({ leftMaxDigits: v }),
+                    DIGIT_OPTIONS.filter((d) => d >= custom.leftMinDigits)
+                  )}
+                  {digitSelect("Right min digits", custom.rightMinDigits, setRightMin, DIGIT_OPTIONS)}
+                  {digitSelect(
+                    "Right max digits",
+                    custom.rightMaxDigits,
+                    (v) => updateCustom({ rightMaxDigits: v }),
+                    DIGIT_OPTIONS.filter((d) => d >= custom.rightMinDigits)
+                  )}
+                  {digitSelect(
+                    "Decimal places",
+                    custom.decimalPlaces,
+                    (v) => updateCustom({ decimalPlaces: v }),
+                    [0, 1, 2, 3, 4]
+                  )}
+                </div>
+
+                {customError && (
+                  <p role="alert" className="mt-4 text-sm text-red-300">
+                    {customError}
+                  </p>
+                )}
               </>
             ) : (
-              "Log in to play"
+              <div className="mt-6">
+                <p className={labelClass}>
+                  <Clock className="h-3.5 w-3.5" /> Timer
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {timersForLevel.map((timer) => (
+                    <button
+                      key={timer}
+                      type="button"
+                      aria-pressed={selectedTimer === timer}
+                      onClick={() => setSelectedTimer(timer)}
+                      className={`${chipClass(selectedTimer === timer)} tabular-nums`}
+                    >
+                      {timer}s
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
-          </button>
-        </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-900/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-400">
+              Selected: <span className="font-medium text-slate-200">{summary}</span>
+            </p>
+            <button
+              type="button"
+              onClick={handleStart}
+              disabled={startDisabled}
+              className={`flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium ${primaryButton}`}
+            >
+              {starting ? (
+                "Starting..."
+              ) : user ? (
+                <>
+                  <Play className="h-4 w-4" /> Start game
+                </>
+              ) : (
+                "Log in to play"
+              )}
+            </button>
+          </div>
+        </section>
+
+        {/* Shortcuts */}
+        <section aria-label="Explore" className="mt-14">
+          <ul className="grid gap-4 sm:grid-cols-3">
+            {FEATURES.map(({ href, icon: Icon, title, text }) => (
+              <li key={href}>
+                <Link
+                  href={href}
+                  className={`block h-full rounded-xl border border-slate-800 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 ${focusRing}`}
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300 ring-1 ring-inset ring-indigo-400/20">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <h3 className="mt-4 text-sm font-semibold text-white">{title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">{text}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </main>
   );

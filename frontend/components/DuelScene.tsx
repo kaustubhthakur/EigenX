@@ -3,20 +3,81 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Shared Three.js background: a glowing Möbius strip.
+ * Shared Three.js background: a refined Möbius strip.
  * Needs: npm i three && npm i -D @types/three
  *
  * focus="side"   -> strip sits on the right (lobby)
  * focus="center" -> strip sits behind the content (duel arena)
- * calm           -> fainter, for data-heavy pages (profile, leaderboard)
+ * calm           -> fainter, for data-heavy pages
  */
 
+// sRGB 0-255, used directly in the shader
 const PALETTE = {
-  surface: 0x8b5cf6, // violet wireframe
-  dots: 0x34d399, // mint points on the strip
-  edge: 0xfbbf24, // amber boundary line
-  dust: 0xddd6fe,
+  a: [99, 102, 241], // indigo-500
+  b: [139, 92, 246], // violet-500
+  c: [34, 211, 238], // cyan-400
+  edge: 0xa5f3fc, // cyan-200
+  dust: 0xc7d2fe, // indigo-200
 };
+
+const VERTEX = /* glsl */ `
+  attribute float aU;
+  attribute float aV;
+  varying vec3 vView;
+  varying float vU;
+  varying float vV;
+
+  void main() {
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vView = mv.xyz;
+    vU = aU;
+    vV = aV;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  uniform float uOpacity;
+  uniform vec3 uA;
+  uniform vec3 uB;
+  uniform vec3 uC;
+  varying vec3 vView;
+  varying float vU;
+  varying float vV;
+
+  void main() {
+    // Per-pixel normal. A Möbius strip is non-orientable, so interpolated
+    // vertex normals would flip at the seam; screen derivatives avoid that.
+    vec3 n = normalize(cross(dFdx(vView), dFdy(vView)));
+    vec3 viewDir = normalize(-vView);
+    float ndv = abs(dot(n, viewDir));
+    float fresnel = pow(1.0 - ndv, 2.5);
+
+    // Colour travels around the loop (only 2π-periodic terms, so no seam)
+    float g1 = 0.5 + 0.5 * sin(vU);
+    float g2 = 0.5 + 0.5 * cos(vU * 2.0 + 1.0);
+    vec3 col = mix(mix(uA, uB, g1), uC, g2 * 0.6);
+
+    // Fine grid lines (symmetric in v so they match across the twist seam)
+    float gv = (vV * 0.5 + 0.5) * 6.0;
+    float dv = abs(fract(gv - 0.5) - 0.5) / max(fwidth(gv), 1e-4);
+    float lineV = 1.0 - min(dv, 1.0);
+
+    float gu = vU / 6.2831853 * 72.0;
+    float du = abs(fract(gu - 0.5) - 0.5) / max(fwidth(gu), 1e-4);
+    float lineU = (1.0 - min(du, 1.0)) * 0.45;
+
+    // Soft light that slowly travels along the strip
+    float pulse = 0.55 + 0.45 * sin(vU * 2.0 - uTime * 0.9);
+    float edge = smoothstep(0.82, 1.0, abs(vV));
+
+    float alpha = 0.07 + fresnel * 0.45 + edge * 0.14 + (lineV + lineU) * 0.16 * pulse;
+    col = mix(col, vec3(1.0), lineV * 0.25 + fresnel * 0.2);
+
+    gl_FragColor = vec4(col, alpha * uOpacity);
+  }
+`;
 
 export default function DuelScene({
   focus = "side",
@@ -42,8 +103,8 @@ export default function DuelScene({
         "(prefers-reduced-motion: reduce)"
       ).matches;
 
-      const k = calm ? 0.55 : 1;
       const center = focus === "center";
+      const strength = (center ? 0.6 : 1) * (calm ? 0.55 : 1);
 
       const renderer = new THREE.WebGLRenderer({
         antialias: true,
@@ -55,99 +116,105 @@ export default function DuelScene({
       mount.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
       camera.position.z = 14;
 
       const disposables: Array<{ dispose: () => void }> = [];
 
-      /* Möbius strip geometry */
-      const U = 180; // steps around the loop
-      const V = 10; // steps across the width
-      const R = 3.4; // loop radius
-      const W = 1.3; // half width
+      /* ---------------- Möbius strip geometry ---------------- */
+      const U = 220; // steps around the loop
+      const V = 28; // steps across the width
+      const R = 3.6; // loop radius
+      const W = 1.35; // half width
 
-      const positions = new Float32Array(U * (V + 1) * 3);
-      for (let i = 0; i < U; i++) {
+      // U + 1 columns: the last one duplicates the first with the width
+      // flipped, which is exactly the half-twist closure.
+      const cols = U + 1;
+      const positions = new Float32Array(cols * (V + 1) * 3);
+      const aU = new Float32Array(cols * (V + 1));
+      const aV = new Float32Array(cols * (V + 1));
+
+      for (let i = 0; i < cols; i++) {
         const u = (i / U) * Math.PI * 2;
         for (let j = 0; j <= V; j++) {
-          const v = (j / V - 0.5) * 2 * W;
+          const vn = (j / V - 0.5) * 2; // -1 .. 1
+          const v = vn * W;
           const r = R + v * Math.cos(u / 2);
-          const idx = (i * (V + 1) + j) * 3;
-          positions[idx] = r * Math.cos(u);
-          positions[idx + 1] = r * Math.sin(u);
-          positions[idx + 2] = v * Math.sin(u / 2);
+          const k = i * (V + 1) + j;
+          positions[k * 3] = r * Math.cos(u);
+          positions[k * 3 + 1] = r * Math.sin(u);
+          positions[k * 3 + 2] = v * Math.sin(u / 2);
+          aU[k] = u;
+          aV[k] = vn;
         }
       }
 
-      // The strip closes with a half twist, so the last column joins
-      // the first with the width direction flipped.
       const indices: number[] = [];
       for (let i = 0; i < U; i++) {
-        const next = (i + 1) % U;
-        const flip = next === 0;
         for (let j = 0; j < V; j++) {
           const a = i * (V + 1) + j;
-          const b = i * (V + 1) + j + 1;
-          const c = next * (V + 1) + (flip ? V - j : j);
-          const d = next * (V + 1) + (flip ? V - (j + 1) : j + 1);
+          const b = a + 1;
+          const c = (i + 1) * (V + 1) + j;
+          const d = c + 1;
           indices.push(a, b, c, b, d, c);
         }
       }
 
       const stripGeo = new THREE.BufferGeometry();
       stripGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      stripGeo.setAttribute("aU", new THREE.BufferAttribute(aU, 1));
+      stripGeo.setAttribute("aV", new THREE.BufferAttribute(aV, 1));
       stripGeo.setIndex(indices);
+
+      const toVec = (c: number[]) =>
+        new THREE.Vector3(c[0] / 255, c[1] / 255, c[2] / 255);
+
+      const surfaceMat = new THREE.ShaderMaterial({
+        vertexShader: VERTEX,
+        fragmentShader: FRAGMENT,
+        uniforms: {
+          uTime: { value: 0 },
+          uOpacity: { value: strength },
+          uA: { value: toVec(PALETTE.a) },
+          uB: { value: toVec(PALETTE.b) },
+          uC: { value: toVec(PALETTE.c) },
+        },
+        transparent: true,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
 
       const strip = new THREE.Group();
       scene.add(strip);
+      strip.add(new THREE.Mesh(stripGeo, surfaceMat));
 
-      const wireMat = new THREE.MeshBasicMaterial({
-        color: PALETTE.surface,
-        wireframe: true,
-        transparent: true,
-        opacity: (center ? 0.22 : 0.38) * (calm ? 0.7 : 1),
-        depthWrite: false,
-      });
-      strip.add(new THREE.Mesh(stripGeo, wireMat));
-
-      const dotMat = new THREE.PointsMaterial({
-        color: PALETTE.dots,
-        size: 0.05,
-        transparent: true,
-        opacity: (center ? 0.5 : 0.8) * k,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      strip.add(new THREE.Points(stripGeo, dotMat));
-
-      // The single continuous edge (a Möbius strip has only one)
-      const edgePts: number[] = [];
+      /* ------- The single continuous edge, as a thin glowing tube ------- */
+      const edgePoints: InstanceType<typeof THREE.Vector3>[] = [];
       for (let pass = 0; pass < 2; pass++) {
         const j = pass === 0 ? 0 : V;
         for (let i = 0; i < U; i++) {
-          const idx = (i * (V + 1) + j) * 3;
-          edgePts.push(positions[idx], positions[idx + 1], positions[idx + 2]);
+          const k = (i * (V + 1) + j) * 3;
+          edgePoints.push(
+            new THREE.Vector3(positions[k], positions[k + 1], positions[k + 2])
+          );
         }
       }
-      const edgeGeo = new THREE.BufferGeometry();
-      edgeGeo.setAttribute(
-        "position",
-        new THREE.BufferAttribute(new Float32Array(edgePts), 3)
-      );
-      const edgeMat = new THREE.PointsMaterial({
+      const curve = new THREE.CatmullRomCurve3(edgePoints, true);
+      const edgeGeo = new THREE.TubeGeometry(curve, 720, 0.02, 6, true);
+      const edgeMat = new THREE.MeshBasicMaterial({
         color: PALETTE.edge,
-        size: 0.07,
         transparent: true,
-        opacity: (center ? 0.55 : 0.9) * k,
+        opacity: 0.8 * strength,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
-      strip.add(new THREE.Points(edgeGeo, edgeMat));
+      strip.add(new THREE.Mesh(edgeGeo, edgeMat));
 
-      disposables.push(stripGeo, wireMat, dotMat, edgeGeo, edgeMat);
+      disposables.push(stripGeo, surfaceMat, edgeGeo, edgeMat);
 
-      /* Quiet star dust */
-      const COUNT = calm ? 160 : 300;
+      /* ---------------- Quiet background dust ---------------- */
+      const COUNT = calm ? 90 : 160;
       const dustPos = new Float32Array(COUNT * 3);
       for (let i = 0; i < COUNT; i++) {
         dustPos[i * 3] = (Math.random() - 0.5) * 40;
@@ -158,16 +225,16 @@ export default function DuelScene({
       dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPos, 3));
       const dustMat = new THREE.PointsMaterial({
         color: PALETTE.dust,
-        size: 0.05,
+        size: 0.04,
         transparent: true,
-        opacity: calm ? 0.3 : 0.5,
+        opacity: calm ? 0.18 : 0.3,
         depthWrite: false,
       });
       const dust = new THREE.Points(dustGeo, dustMat);
       scene.add(dust);
       disposables.push(dustGeo, dustMat);
 
-      /* Sizing + placement */
+      /* ---------------- Sizing + placement ---------------- */
       const resize = () => {
         const w = mount.clientWidth || window.innerWidth;
         const h = mount.clientHeight || window.innerHeight;
@@ -178,10 +245,13 @@ export default function DuelScene({
 
         if (center) {
           strip.position.set(0, 0, -6);
+          strip.scale.setScalar(w < 700 ? 0.8 : 1);
         } else if (w < 900) {
           strip.position.set(0, 4, -3);
+          strip.scale.setScalar(0.8);
         } else {
           strip.position.set(5.5, 0.5, -3);
+          strip.scale.setScalar(1);
         }
 
         camera.updateProjectionMatrix();
@@ -189,7 +259,7 @@ export default function DuelScene({
       resize();
       window.addEventListener("resize", resize);
 
-      /* Mouse parallax */
+      /* ---------------- Mouse parallax ---------------- */
       const pointer = { x: 0, y: 0 };
       const onMove = (event: PointerEvent) => {
         pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
@@ -197,19 +267,20 @@ export default function DuelScene({
       };
       window.addEventListener("pointermove", onMove, { passive: true });
 
-      /* Loop */
+      /* ---------------- Loop ---------------- */
       const clock = new THREE.Clock();
       let frame = 0;
 
       const render = () => {
         const t = clock.getElapsedTime();
 
-        strip.rotation.x = -1.1 + Math.sin(t * 0.2) * 0.15;
-        strip.rotation.z = t * 0.12;
-        dust.rotation.y = t * 0.008;
+        surfaceMat.uniforms.uTime.value = t;
+        strip.rotation.x = -1.15 + Math.sin(t * 0.2) * 0.08;
+        strip.rotation.z = t * 0.1;
+        dust.rotation.y = t * 0.006;
 
-        camera.position.x += (pointer.x * 0.9 - camera.position.x) * 0.04;
-        camera.position.y += (-pointer.y * 0.6 - camera.position.y) * 0.04;
+        camera.position.x += (pointer.x * 0.7 - camera.position.x) * 0.04;
+        camera.position.y += (-pointer.y * 0.5 - camera.position.y) * 0.04;
         camera.lookAt(0, 0, 0);
 
         renderer.render(scene, camera);
