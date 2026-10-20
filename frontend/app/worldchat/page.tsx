@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DuelScene from "../../components/DuelScene";
 import DuelRequests from "../../components/worldchat/DuelRequests";
@@ -30,14 +30,25 @@ const duelRoute = (duelId: string | number) => `/duel/${duelId}`;
 const MAX_LENGTH = 500;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
-const gutter =
-  "px-4 sm:px-8 lg:px-[max(2rem,calc(50%_-_28rem))]";
-
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+const formatDay = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: d.getFullYear() === today.getFullYear() ? undefined : "numeric",
+  });
+};
 
 /** Keep older history we already loaded, replace the newest window with the server's copy. */
 const mergeWindow = (prev: WorldMessage[], latest: WorldMessage[]) => {
@@ -45,6 +56,33 @@ const mergeWindow = (prev: WorldMessage[], latest: WorldMessage[]) => {
   const minId = Number(latest[0].id);
   return [...prev.filter((m) => Number(m.id) < minId), ...latest];
 };
+
+/* Small inline icons so no extra dependency is needed */
+const ChatIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+  </svg>
+);
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m5 12 14-7-5 14-2.5-5.5L5 12Z" />
+  </svg>
+);
+const ArrowDownIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 5v14m0 0-6-6m6 6 6-6" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16M10 11v6m4-6v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+  </svg>
+);
+const SwordsIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m14.5 17.5 5 5M3 3l8 8m10-8-8 8M13 13l-8.5 8.5M9.5 17.5l-5 5" />
+  </svg>
+);
 
 export default function WorldChatPage() {
   const router = useRouter();
@@ -254,95 +292,138 @@ export default function WorldChatPage() {
   }
 
   return (
-    <main className="relative h-[calc(100vh-4rem)] bg-[#070815]">
+    <main className="relative flex h-[calc(100vh-4rem)] flex-col overflow-hidden bg-[#070815]">
       <DuelScene calm />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_45%_at_50%_0%,rgba(99,102,241,0.14),transparent_70%)]"
+      />
 
-      <section className="relative z-10 flex h-full min-h-0 flex-col bg-[#0b0c1f]/60 backdrop-blur-xl">
-          <header className={`border-b border-white/10 py-3 ${gutter}`}>
-            <h1 className="text-base font-semibold text-white">World chat</h1>
-            <p className="text-xs text-slate-500">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col bg-[#0b0c1f]/60 backdrop-blur-xl">
+        {/* Header */}
+        <header className="flex items-center gap-3 border-b border-white/10 bg-[#0b0c1f]/70 px-4 py-3 sm:px-6">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30 ring-1 ring-inset ring-white/20">
+            <ChatIcon />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[15px] font-semibold leading-tight text-white">World chat</h1>
+            <p className="truncate text-xs text-slate-400">
               Tap a name to see their profile and challenge them
             </p>
-          </header>
-
-          <div className="lg:px-[max(1.25rem,calc(50%_-_28.75rem))]">
-            <DuelRequests
-              incoming={incoming}
-              outgoing={outgoing}
-              busyId={busyId}
-              onAccept={handleAccept}
-              onDecline={handleDecline}
-              onCancel={handleCancel}
-            />
           </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 ring-1 ring-inset ring-emerald-400/20">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 motion-safe:animate-ping" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+            Live
+          </span>
+        </header>
 
-          <div className="relative min-h-0 flex-1">
-            <div
-              ref={listRef}
-              onScroll={onScroll}
-              className={`h-full overflow-y-auto py-4 ${gutter}`}
-              aria-live="polite"
-            >
-              {loadingMessages ? (
-                <div className="space-y-4">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="flex gap-3">
-                      <div className="h-9 w-9 animate-pulse rounded-full bg-white/10" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-3 w-28 animate-pulse rounded bg-white/10" />
-                        <div className="h-3 w-2/3 animate-pulse rounded bg-white/5" />
-                      </div>
-                    </div>
-                  ))}
+        {/* Duel requests */}
+        <div className="empty:hidden px-3 sm:px-6">
+          <DuelRequests
+            incoming={incoming}
+            outgoing={outgoing}
+            busyId={busyId}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
+            onCancel={handleCancel}
+          />
+        </div>
+
+        {/* Messages */}
+        <div className="relative min-h-0 flex-1">
+          <div
+            ref={listRef}
+            onScroll={onScroll}
+            className="h-full overflow-y-auto px-3 py-4 sm:px-6 [scrollbar-color:rgba(255,255,255,0.12)_transparent] [scrollbar-width:thin]"
+            aria-live="polite"
+          >
+            {loadingMessages ? (
+              <div className="space-y-5">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="h-10 w-10 animate-pulse rounded-full bg-white/10" />
+                    <div className="h-14 w-2/3 max-w-md animate-pulse rounded-2xl bg-white/[0.06]" />
+                  </div>
+                ))}
+              </div>
+            ) : loadError && messages.length === 0 ? (
+              <div className="mx-auto mt-16 max-w-xs rounded-xl border border-rose-400/20 bg-rose-400/5 p-4 text-center">
+                <p className="text-sm font-medium text-rose-200">Couldn’t load messages</p>
+                <p className="mt-1 text-xs text-rose-300/80">{loadError}</p>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="mx-auto mt-24 flex max-w-xs flex-col items-center text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05] text-indigo-300 ring-1 ring-inset ring-white/10">
+                  <ChatIcon />
                 </div>
-              ) : loadError && messages.length === 0 ? (
-                <p className="py-10 text-center text-sm text-rose-300">{loadError}</p>
-              ) : messages.length === 0 ? (
-                <p className="py-10 text-center text-sm text-slate-400">
-                  No messages yet. Say hello and start a duel.
-                </p>
-              ) : (
-                <ul className="space-y-0.5">
-                  {messages.map((m, i) => {
-                    const prev = messages[i - 1];
-                    const grouped =
-                      !!prev &&
-                      String(prev.user_id) === String(m.user_id) &&
-                      new Date(m.created_at).getTime() -
-                        new Date(prev.created_at).getTime() <
-                        GROUP_WINDOW_MS;
-                    const mine = String(m.user_id) === myId;
+                <p className="mt-4 text-sm font-semibold text-white">No messages yet</p>
+                <p className="mt-1 text-sm text-slate-400">Say hello, then challenge someone to a duel.</p>
+              </div>
+            ) : (
+              <ul>
+                {messages.map((m, i) => {
+                  const prev = messages[i - 1];
+                  const newDay =
+                    !prev ||
+                    new Date(prev.created_at).toDateString() !==
+                      new Date(m.created_at).toDateString();
+                  const grouped =
+                    !newDay &&
+                    String(prev.user_id) === String(m.user_id) &&
+                    new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() <
+                      GROUP_WINDOW_MS;
+                  const mine = String(m.user_id) === myId;
 
-                    return (
+                  return (
+                    <Fragment key={m.id}>
+                      {newDay && (
+                        <li role="separator" className="my-4 flex items-center gap-3 first:mt-0">
+                          <span className="h-px flex-1 bg-white/10" />
+                          <span className="rounded-full bg-white/[0.05] px-2.5 py-0.5 text-xs font-medium text-slate-400 ring-1 ring-inset ring-white/10">
+                            {formatDay(m.created_at)}
+                          </span>
+                          <span className="h-px flex-1 bg-white/10" />
+                        </li>
+                      )}
+
                       <li
-                        key={m.id}
-                        className={`group flex gap-3 rounded-lg px-2 py-0.5 hover:bg-white/[0.03] ${
-                          grouped ? "" : "mt-3"
+                        className={`group flex items-start gap-2.5 ${grouped ? "mt-1" : "mt-4"} ${
+                          mine ? "flex-row-reverse" : ""
                         }`}
                       >
-                        <div className="w-9 shrink-0">
-                          {!grouped && (
-                            <button
-                              type="button"
-                              onClick={() => setProfileId(m.user_id)}
-                              className={`rounded-full ${focusRing}`}
-                              aria-label={`View ${m.username}'s profile`}
-                            >
-                              <UserAvatar name={m.username} avatar={m.avatar} size={36} />
-                            </button>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          {!grouped && (
-                            <div className="flex items-baseline gap-2">
+                        {/* Avatar column (others only) */}
+                        {!mine && (
+                          <div className="w-10 shrink-0">
+                            {!grouped && (
+                              <button
+                                type="button"
+                                onClick={() => setProfileId(m.user_id)}
+                                className={`rounded-full ring-2 ring-white/10 transition hover:ring-indigo-400/60 ${focusRing}`}
+                                aria-label={`View ${m.username}'s profile`}
+                              >
+                                <UserAvatar name={m.username} avatar={m.avatar} size={40} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Bubble */}
+                        <div
+                          className={`min-w-0 max-w-[85%] sm:max-w-[65%] ${mine ? "text-right" : ""}`}
+                        >
+                          {!grouped && !mine && (
+                            <div className="mb-1 flex items-center gap-2 px-1">
                               <button
                                 type="button"
                                 onClick={() => setProfileId(m.user_id)}
                                 className={`truncate rounded text-sm font-semibold text-white hover:underline ${focusRing}`}
                               >
-                                {mine ? `${m.username} (you)` : m.username}
+                                {m.username}
                               </button>
-                              <span className="rounded bg-white/[0.06] px-1.5 py-px text-[11px] text-slate-400">
+                              <span className="rounded-md bg-amber-400/10 px-1.5 py-px text-[11px] font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
                                 Lv {m.level}
                               </span>
                               <time className="text-xs text-slate-500" dateTime={m.created_at}>
@@ -350,79 +431,128 @@ export default function WorldChatPage() {
                               </time>
                             </div>
                           )}
-                          <p className="break-words text-sm leading-relaxed text-slate-200">
+                          {!grouped && mine && (
+                            <div className="mb-1 flex items-center justify-end gap-2 px-1">
+                              <time className="text-xs text-slate-500" dateTime={m.created_at}>
+                                {formatTime(m.created_at)}
+                              </time>
+                              <span className="rounded-md bg-amber-400/10 px-1.5 py-px text-[11px] font-semibold text-amber-300 ring-1 ring-inset ring-amber-400/20">
+                                Lv {m.level}
+                              </span>
+                              <span className="text-sm font-semibold text-indigo-300">You</span>
+                            </div>
+                          )}
+                          <p
+                            title={formatTime(m.created_at)}
+                            className={`inline-block break-words rounded-2xl px-3.5 py-2 text-left text-sm leading-relaxed ${
+                              mine
+                                ? "rounded-tr-md bg-indigo-500 text-white shadow-md shadow-indigo-500/20 ring-1 ring-inset ring-white/15"
+                                : "rounded-tl-md bg-white/[0.07] text-slate-100 ring-1 ring-inset ring-white/10"
+                            }`}
+                          >
                             {m.content}
                           </p>
                         </div>
-                        {mine && (
+
+                        {/* Hover action */}
+                        {mine ? (
                           <button
                             type="button"
                             onClick={() => handleDelete(m.id)}
                             aria-label="Delete message"
-                            className={`h-7 shrink-0 self-start rounded px-2 text-xs text-slate-500 opacity-0 transition hover:bg-white/10 hover:text-rose-300 focus-visible:opacity-100 group-hover:opacity-100 ${focusRing}`}
+                            title="Delete message"
+                            className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 opacity-0 transition hover:bg-rose-400/10 hover:text-rose-300 focus-visible:opacity-100 group-hover:opacity-100 ${focusRing}`}
                           >
-                            Delete
+                            <TrashIcon />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setProfileId(m.user_id)}
+                            className={`mt-1 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-300 opacity-0 ring-1 ring-inset ring-white/10 transition hover:bg-indigo-400/15 hover:text-indigo-200 focus-visible:opacity-100 group-hover:opacity-100 ${focusRing}`}
+                          >
+                            <SwordsIcon />
+                            Challenge
                           </button>
                         )}
                       </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            {showJump && (
-              <button
-                type="button"
-                onClick={jumpToLatest}
-                className={`absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg ring-1 ring-inset ring-white/10 hover:bg-indigo-400 ${focusRing}`}
-              >
-                Jump to latest
-              </button>
+                    </Fragment>
+                  );
+                })}
+              </ul>
             )}
           </div>
 
-          {notice && (
+          {showJump && (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              className={`absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-indigo-500/30 ring-1 ring-inset ring-white/20 transition-colors hover:bg-indigo-400 ${focusRing}`}
+            >
+              <ArrowDownIcon />
+              Jump to latest
+            </button>
+          )}
+        </div>
+
+        {/* Notice */}
+        {notice && (
+          <div className="px-3 pb-2 sm:px-6">
             <p
               role="status"
-              className={`border-t border-white/10 bg-white/[0.04] py-2 text-sm text-slate-200 ${gutter}`}
+              className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-slate-200"
             >
               {notice}
             </p>
-          )}
+          </div>
+        )}
 
-          <form
-            onSubmit={handleSend}
-            className={`border-t border-white/10 py-3 ${gutter}`}
-          >
-            <div className="flex items-center gap-2">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
-                placeholder="Message the world"
-                aria-label="Message"
-                maxLength={MAX_LENGTH}
-                className={`h-10 min-w-0 flex-1 rounded-lg bg-white/[0.05] px-3.5 text-sm text-white placeholder:text-slate-500 ring-1 ring-inset ring-white/10 ${focusRing}`}
-              />
-              <button
-                type="submit"
-                disabled={!draft.trim() || sending}
-                className={`inline-flex h-10 items-center rounded-lg bg-indigo-500 px-4 text-sm font-semibold text-white ring-1 ring-inset ring-white/10 transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400 ${focusRing}`}
+        {/* Composer */}
+        <form
+          onSubmit={handleSend}
+          className="border-t border-white/10 bg-[#0b0c1f]/80 px-3 py-3 sm:px-6"
+        >
+          <div className="flex items-center gap-2 rounded-xl bg-white/[0.05] p-1.5 pl-4 ring-1 ring-inset ring-white/10 transition focus-within:bg-white/[0.07] focus-within:ring-indigo-400/60">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
+              placeholder="Message the world"
+              aria-label="Message"
+              maxLength={MAX_LENGTH}
+              autoComplete="off"
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+            />
+            {nearLimit && (
+              <span
+                className={`shrink-0 text-xs tabular-nums ${
+                  draft.length >= MAX_LENGTH ? "text-rose-300" : "text-slate-500"
+                }`}
               >
-                {sending ? "Sending…" : "Send"}
-              </button>
-            </div>
-            <div className="mt-1.5 flex justify-between px-1 text-xs">
-              <span className="text-rose-300">{sendError}</span>
-              {nearLimit && (
-                <span className="text-slate-500">
-                  {draft.length}/{MAX_LENGTH}
-                </span>
+                {draft.length}/{MAX_LENGTH}
+              </span>
+            )}
+            <button
+              type="submit"
+              disabled={!draft.trim() || sending}
+              className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-indigo-500 px-4 text-sm font-semibold text-white shadow-md shadow-indigo-500/25 ring-1 ring-inset ring-white/20 transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none disabled:ring-white/5 ${focusRing}`}
+            >
+              {sending ? (
+                "Sending…"
+              ) : (
+                <>
+                  Send
+                  <SendIcon />
+                </>
               )}
-            </div>
-          </form>
-        </section>
-
+            </button>
+          </div>
+          {sendError && (
+            <p role="alert" className="mt-1.5 px-1 text-xs text-rose-300">
+              {sendError}
+            </p>
+          )}
+        </form>
+      </div>
 
       {profileId !== null && (
         <ProfileCard
