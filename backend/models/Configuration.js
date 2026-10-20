@@ -1,7 +1,6 @@
 const pool = require("../db");
 
-// The only fixed (non-custom) level players can use.
-// Levels 2 and 3 stay in the database but are hidden.
+
 const STANDARD_LEVEL = 1;
 
 exports.STANDARD_LEVEL = STANDARD_LEVEL;

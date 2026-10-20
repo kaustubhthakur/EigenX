@@ -227,7 +227,7 @@ exports.acceptDuelRequest = async (req, res) => {
         receiverId: accepted.receiver_id,
       });
     } catch (err) {
-      // Don't leave the request stuck as "accepted" with no duel behind it.
+   
       await worldChat.revertAcceptedRequest({ requestId }).catch(() => {});
       throw err;
     }

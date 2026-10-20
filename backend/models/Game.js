@@ -41,7 +41,7 @@ exports.getGameSession = async (sessionId) => {
 };
 
 exports.getRandomArithmetic = async (level, customSettings = null) => {
-  // Custom level: build the rule from the player's own settings
+
   if (customSettings) {
     const ops = customSettings.operations;
     const operation = ops[Math.floor(Math.random() * ops.length)];
@@ -58,7 +58,7 @@ exports.getRandomArithmetic = async (level, customSettings = null) => {
     };
   }
 
-  // Normal levels: unchanged
+
   const result = await pool.query(
     `
     SELECT

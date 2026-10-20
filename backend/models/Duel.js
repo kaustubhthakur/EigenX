@@ -454,7 +454,7 @@ exports.resolveAnswer = async (
       };
     }
 
-    // Ignore answers to a question that has already been replaced
+
     if (
       question != null &&
       String(question) !== String(duel.current_question)

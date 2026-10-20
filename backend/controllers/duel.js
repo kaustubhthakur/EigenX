@@ -13,7 +13,6 @@ const isValidId = (value) =>
     Number.isSafeInteger(value) &&
     value > 0);
 
-// If the duel has no start time yet, treat it as 0 seconds elapsed
 const getElapsedSeconds = (startedAt) => {
   if (!startedAt) return 0;
 

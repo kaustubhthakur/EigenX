@@ -192,7 +192,6 @@ function standardQuestion() {
   return { question: `${x} ${operator} ${y}`, answer };
 }
 
-// Returns { question, answer }.
 function buildQuestion(settings) {
   if (!settings) return standardQuestion();
 
