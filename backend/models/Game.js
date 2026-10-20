@@ -162,3 +162,24 @@ exports.finishGame = async (sessionId) => {
 
   return result.rows[0];
 };
+
+exports.getBestScoreByLevel = async (userId) => {
+  const result = await pool.query(
+    `
+    SELECT
+      CASE WHEN c.is_custom THEN 'custom' ELSE c.level::text END AS level,
+      MAX(gs.score) AS best_score,
+      COUNT(*)::int AS games_played
+    FROM game_sessions gs
+    JOIN configurations c
+      ON gs.configuration_id = c.id
+    WHERE gs.user_id = $1
+      AND gs.is_finished = TRUE
+    GROUP BY 1
+    ORDER BY best_score DESC
+    `,
+    [userId]
+  );
+
+  return result.rows;
+};
