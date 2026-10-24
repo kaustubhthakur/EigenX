@@ -394,14 +394,16 @@ export default function WorldChatPage() {
                       <li
                         className={`group relative -mx-3 flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-white/[0.035] focus-within:bg-white/[0.035] ${
                           grouped ? "" : "mt-3 first:mt-0"
-                        }`}
+                        } ${mine ? "flex-row-reverse" : ""}`}
                       >
                         {/* Gutter: avatar, or the time on hover for grouped messages */}
                         <div className="w-9 shrink-0">
                           {grouped ? (
                             <time
                               dateTime={m.created_at}
-                              className="block pt-0.5 text-right text-[11px] leading-6 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100"
+                              className={`block pt-0.5 text-[11px] leading-6 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 ${
+                                mine ? "text-left" : "text-right"
+                              }`}
                             >
                               {formatTime(m.created_at)}
                             </time>
@@ -418,9 +420,13 @@ export default function WorldChatPage() {
                         </div>
 
                         {/* Content */}
-                        <div className="min-w-0 flex-1">
+                        <div className={`min-w-0 flex-1 ${mine ? "flex flex-col items-end" : ""}`}>
                           {!grouped && (
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <div
+                              className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${
+                                mine ? "flex-row-reverse" : ""
+                              }`}
+                            >
                               <button
                                 type="button"
                                 onClick={() => setProfileId(m.user_id)}
@@ -443,13 +449,21 @@ export default function WorldChatPage() {
                               </time>
                             </div>
                           )}
-                          <p className="break-words text-[15px] leading-6 text-slate-200">
+                          <p
+                            className={`break-words text-[15px] leading-6 ${
+                              mine
+                                ? `${grouped ? "" : "mt-1"} max-w-[85%] rounded-2xl bg-indigo-500 px-3.5 py-2 text-left text-white ${
+                                    grouped ? "" : "rounded-tr-md"
+                                  }`
+                                : "text-slate-200"
+                            }`}
+                          >
                             {m.content}
                           </p>
                         </div>
 
                         {/* Hover toolbar */}
-                        <div className="absolute -top-3 right-3 flex items-center rounded-lg border border-white/10 bg-[#141729] p-0.5 opacity-0 shadow-lg shadow-black/30 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                        <div className={`absolute -top-3 ${mine ? "left-3" : "right-3"} flex items-center rounded-lg border border-white/10 bg-[#141729] p-0.5 opacity-0 shadow-lg shadow-black/30 transition-opacity focus-within:opacity-100 group-hover:opacity-100`}>
                           {mine ? (
                             <button
                               type="button"
