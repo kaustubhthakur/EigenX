@@ -121,15 +121,16 @@ export default function Navbar() {
             href="/"
             className={`flex items-center gap-2.5 rounded-lg ${focusRing}`}
           >
-            {/* If your logo is a white mark, brightness-0 turns it dark on the
-                light theme. Remove it if the logo already works on both. */}
+            {/* The PNG is a white mark on a black background.
+                Light: invert to black-on-white, multiply drops the white.
+                Dark: keep as is, screen drops the black. */}
             <Image
               src="/logo.png"
               alt="EigenX"
               width={32}
               height={32}
               priority
-              className="h-8 w-8 object-contain mix-blend-multiply brightness-0 dark:brightness-100"
+              className="h-8 w-8 object-contain mix-blend-multiply invert dark:mix-blend-screen dark:invert-0"
             />
             <span className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">
               EigenX
