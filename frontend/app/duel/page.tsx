@@ -36,12 +36,6 @@ type IncomingChallenge = Challenge & {
   custom_settings?: CustomSettings | null;
 };
 
-/* ------------------------------------------------------------------ */
-/* Custom rules                                                        */
-/* ------------------------------------------------------------------ */
-
-// The configuration with this level (or flagged is_custom) lets players
-// set their own rules instead of using fixed ones.
 const CUSTOM_LEVEL = 4;
 
 const isCustomConfiguration = (configuration: GameConfiguration): boolean =>
@@ -128,8 +122,6 @@ function validateSettings(settings: CustomSettings): string | null {
     return "Decimal places must be between 0 and 3.";
   }
 
-  // The first number is always larger than the second, and both are at
-  // least 2, so the first number needs room to be bigger.
   const smallestSecond = Math.max(2, 10 ** (settings.rightMinDigits - 1));
   const largestFirst = 10 ** settings.leftMaxDigits - 1;
 
@@ -149,10 +141,6 @@ function validateSettings(settings: CustomSettings): string | null {
   return null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
-
 function formatTimer(seconds: number): string {
   if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60} min`;
   return `${seconds}s`;
@@ -169,271 +157,27 @@ function initials(name: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* Three.js background                                                 */
-/* Needs: npm i three && npm i -D @types/three                         */
-/* Loaded lazily inside useEffect so it never runs during SSR.         */
-/* ------------------------------------------------------------------ */
-
-function DuelScene() {
-  const mountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
-
-    let disposed = false;
-    let cleanup: () => void = () => {};
-
-    (async () => {
-      const THREE = await import("three");
-      if (disposed || !mount) return;
-
-      const reduceMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: "high-performance",
-      });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setClearColor(0x000000, 0);
-      mount.appendChild(renderer.domElement);
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100);
-      camera.position.z = 14;
-
-      const disposables: Array<{ dispose: () => void }> = [];
-
-      /* Central wireframe: two crossing shapes, like a duel */
-      const hero = new THREE.Group();
-      hero.position.set(5.5, 0.5, -3);
-      scene.add(hero);
-
-      const coreGeo = new THREE.IcosahedronGeometry(2.8, 1);
-      const coreMat = new THREE.MeshBasicMaterial({
-        color: 0x818cf8,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.28,
-      });
-      const core = new THREE.Mesh(coreGeo, coreMat);
-      hero.add(core);
-
-      const innerGeo = new THREE.OctahedronGeometry(1.5, 0);
-      const innerMat = new THREE.MeshBasicMaterial({
-        color: 0x22d3ee,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.55,
-      });
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      hero.add(inner);
-
-      const ringGeo = new THREE.TorusGeometry(4.2, 0.012, 8, 160);
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xa78bfa,
-        transparent: true,
-        opacity: 0.45,
-      });
-      const ringA = new THREE.Mesh(ringGeo, ringMat);
-      ringA.rotation.x = Math.PI / 2.4;
-      const ringB = new THREE.Mesh(ringGeo, ringMat);
-      ringB.rotation.y = Math.PI / 2.6;
-      ringB.scale.setScalar(0.82);
-      hero.add(ringA, ringB);
-
-      disposables.push(coreGeo, coreMat, innerGeo, innerMat, ringGeo, ringMat);
-
-      /* Floating math symbols */
-      const symbols = ["+", "\u2212", "\u00d7", "\u00f7", "=", "%", "\u221a", "\u03c0"];
-      const colors = ["#a5b4fc", "#67e8f9", "#c4b5fd", "#f0abfc"];
-      const textures: Array<InstanceType<typeof THREE.CanvasTexture>> = [];
-
-      symbols.forEach((symbol, i) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.font = "600 88px ui-sans-serif, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = colors[i % colors.length];
-        ctx.shadowColor = colors[i % colors.length];
-        ctx.shadowBlur = 18;
-        ctx.fillText(symbol, 64, 70);
-        textures.push(new THREE.CanvasTexture(canvas));
-      });
-
-      type Floater = {
-        sprite: InstanceType<typeof THREE.Sprite>;
-        baseY: number;
-        speed: number;
-        phase: number;
-        spin: number;
-      };
-      const floaters: Floater[] = [];
-      const spriteMats: Array<InstanceType<typeof THREE.SpriteMaterial>> = [];
-
-      for (let i = 0; i < 22; i++) {
-        const texture = textures[i % textures.length];
-        if (!texture) continue;
-        const mat = new THREE.SpriteMaterial({
-          map: texture,
-          transparent: true,
-          opacity: 0.16 + Math.random() * 0.3,
-          depthWrite: false,
-        });
-        spriteMats.push(mat);
-        const sprite = new THREE.Sprite(mat);
-        const size = 0.9 + Math.random() * 1.5;
-        sprite.scale.set(size, size, 1);
-        sprite.position.set(
-          (Math.random() - 0.5) * 30,
-          (Math.random() - 0.5) * 16,
-          -8 + Math.random() * 11
-        );
-        scene.add(sprite);
-        floaters.push({
-          sprite,
-          baseY: sprite.position.y,
-          speed: 0.15 + Math.random() * 0.35,
-          phase: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 0.4,
-        });
-      }
-
-      /* Star dust */
-      const COUNT = 320;
-      const positions = new Float32Array(COUNT * 3);
-      for (let i = 0; i < COUNT; i++) {
-        positions[i * 3] = (Math.random() - 0.5) * 40;
-        positions[i * 3 + 1] = (Math.random() - 0.5) * 24;
-        positions[i * 3 + 2] = -12 + Math.random() * 18;
-      }
-      const dustGeo = new THREE.BufferGeometry();
-      dustGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      const dustMat = new THREE.PointsMaterial({
-        color: 0xc7d2fe,
-        size: 0.05,
-        transparent: true,
-        opacity: 0.55,
-        depthWrite: false,
-      });
-      const dust = new THREE.Points(dustGeo, dustMat);
-      scene.add(dust);
-      disposables.push(dustGeo, dustMat);
-
-      /* Sizing */
-      const resize = () => {
-        const w = mount.clientWidth || window.innerWidth;
-        const h = mount.clientHeight || window.innerHeight;
-        renderer.setSize(w, h, false);
-        renderer.domElement.style.width = "100%";
-        renderer.domElement.style.height = "100%";
-        camera.aspect = w / h;
-        // On narrow screens, pull the hero shape toward the centre
-        hero.position.x = w < 900 ? 0 : 5.5;
-        hero.position.y = w < 900 ? 4 : 0.5;
-        camera.updateProjectionMatrix();
-      };
-      resize();
-      window.addEventListener("resize", resize);
-
-      /* Mouse parallax */
-      const pointer = { x: 0, y: 0 };
-      const onMove = (event: PointerEvent) => {
-        pointer.x = (event.clientX / window.innerWidth - 0.5) * 2;
-        pointer.y = (event.clientY / window.innerHeight - 0.5) * 2;
-      };
-      window.addEventListener("pointermove", onMove, { passive: true });
-
-      /* Loop */
-      const clock = new THREE.Clock();
-      let frame = 0;
-
-      const render = () => {
-        const t = clock.getElapsedTime();
-
-        core.rotation.y = t * 0.12;
-        core.rotation.x = t * 0.05;
-        inner.rotation.y = -t * 0.35;
-        inner.rotation.z = t * 0.2;
-        ringA.rotation.z = t * 0.1;
-        ringB.rotation.x = t * 0.12;
-        hero.position.y += Math.sin(t * 0.6) * 0.0015;
-
-        floaters.forEach((f) => {
-          f.sprite.position.y = f.baseY + Math.sin(t * f.speed + f.phase) * 0.8;
-          f.sprite.material.rotation += f.spin * 0.002;
-        });
-
-        dust.rotation.y = t * 0.008;
-
-        camera.position.x += (pointer.x * 0.9 - camera.position.x) * 0.04;
-        camera.position.y += (-pointer.y * 0.6 - camera.position.y) * 0.04;
-        camera.lookAt(0, 0, 0);
-
-        renderer.render(scene, camera);
-      };
-
-      const loop = () => {
-        render();
-        frame = requestAnimationFrame(loop);
-      };
-
-      if (reduceMotion) {
-        render(); // one still frame
-      } else {
-        loop();
-      }
-
-      cleanup = () => {
-        cancelAnimationFrame(frame);
-        window.removeEventListener("resize", resize);
-        window.removeEventListener("pointermove", onMove);
-        disposables.forEach((d) => d.dispose());
-        spriteMats.forEach((m) => m.dispose());
-        textures.forEach((tx) => tx.dispose());
-        renderer.dispose();
-        if (renderer.domElement.parentNode === mount) {
-          mount.removeChild(renderer.domElement);
-        }
-      };
-    })();
-
-    return () => {
-      disposed = true;
-      cleanup();
-    };
-  }, []);
-
-  return (
-    <div
-      ref={mountRef}
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0"
-    />
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Small presentational pieces                                         */
+/* Shared styles and small presentational pieces                       */
 /* ------------------------------------------------------------------ */
 
 const focusRing =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
 
-const glass =
-  "rounded-2xl bg-slate-900/60 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+// Solid, quiet surface. Same navy/indigo palette as before, no blur or glow.
+const panel =
+  "rounded-xl border border-white/10 bg-slate-900/70 shadow-lg shadow-black/20";
+
+const accentGradient = "bg-gradient-to-br from-indigo-500 to-violet-600";
+
+const primaryButton = `rounded-lg ${accentGradient} px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:hover:brightness-100`;
+
+const secondaryButton =
+  "rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50";
 
 function Spinner({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg
-      className={`animate-spin ${className}`}
+      className={`animate-spin motion-reduce:animate-none ${className}`}
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -473,10 +217,12 @@ function Avatar({
         <img
           src={url}
           alt=""
-          className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
+          className="h-10 w-10 rounded-full object-cover ring-1 ring-white/15"
         />
       ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-semibold text-white ring-2 ring-white/10">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-full ${accentGradient} text-sm font-semibold text-white ring-1 ring-white/15`}
+        >
           {initials(name)}
         </div>
       )}
@@ -484,9 +230,7 @@ function Avatar({
       {online !== undefined && (
         <span
           className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
-            online
-              ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
-              : "bg-slate-600"
+            online ? "bg-emerald-400" : "bg-slate-600"
           }`}
           aria-hidden="true"
         />
@@ -518,7 +262,7 @@ function NumberField({
         max={max}
         value={Number.isNaN(value) ? "" : value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1.5 w-full rounded-lg border-0 bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-inset ring-white/10 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        className="mt-1.5 w-full rounded-lg border-0 bg-slate-950/60 px-3 py-2 text-sm tabular-nums text-white ring-1 ring-inset ring-white/10 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
       />
     </label>
   );
@@ -541,7 +285,7 @@ function Banner({
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      className={`flex items-start justify-between gap-3 rounded-xl px-4 py-3 text-sm ring-1 backdrop-blur ${styles}`}
+      className={`flex items-start justify-between gap-3 rounded-lg px-4 py-3 text-sm ring-1 ${styles}`}
     >
       <p>{children}</p>
       <button
@@ -550,7 +294,12 @@ function Banner({
         aria-label="Dismiss message"
         className={`-m-1 rounded p-1 opacity-60 transition hover:opacity-100 ${focusRing}`}
       >
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+        <svg
+          viewBox="0 0 20 20"
+          className="h-4 w-4"
+          fill="currentColor"
+          aria-hidden="true"
+        >
           <path d="M5.3 5.3a1 1 0 011.4 0L10 8.6l3.3-3.3a1 1 0 111.4 1.4L11.4 10l3.3 3.3a1 1 0 01-1.4 1.4L10 11.4l-3.3 3.3a1 1 0 01-1.4-1.4L8.6 10 5.3 6.7a1 1 0 010-1.4z" />
         </svg>
       </button>
@@ -560,7 +309,10 @@ function Banner({
 
 function SkeletonRows({ count }: { count: number }) {
   return (
-    <div className="animate-pulse space-y-5" aria-hidden="true">
+    <div
+      className="animate-pulse space-y-5 motion-reduce:animate-none"
+      aria-hidden="true"
+    >
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center gap-5">
           <div className="h-4 w-16 rounded bg-white/10" />
@@ -571,6 +323,32 @@ function SkeletonRows({ count }: { count: number }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function PanelHeader({
+  id,
+  title,
+  subtitle,
+  badge,
+}: {
+  id: string;
+  title: string;
+  subtitle?: ReactNode;
+  badge?: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 px-6 py-5">
+      <div className="min-w-0">
+        <h2 id={id} className="text-base font-semibold text-white">
+          {title}
+        </h2>
+        {subtitle && (
+          <div className="mt-1 text-sm text-slate-400">{subtitle}</div>
+        )}
+      </div>
+      {badge}
     </div>
   );
 }
@@ -970,22 +748,21 @@ export default function DuelLobbyPage() {
   /* ------------------------------- render ------------------------------- */
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] px-4 py-12 text-slate-100 sm:px-6">
-      {/* Ambient colour behind the 3D scene */}
+    <div className="relative isolate min-h-screen bg-[#070815] px-4 py-10 text-slate-100 sm:px-6 lg:py-14">
+      {/* Static ambient colour (same palette as before, no animation) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_30%,rgba(99,102,241,0.22),transparent),radial-gradient(45%_40%_at_10%_90%,rgba(34,211,238,0.12),transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_0%,rgba(99,102,241,0.18),transparent),radial-gradient(45%_40%_at_10%_100%,rgba(34,211,238,0.08),transparent)]"
       />
-      <DuelScene />
 
-      <div className="relative z-10 mx-auto max-w-6xl">
-        <header className="mb-10 max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+      <div className="mx-auto max-w-6xl">
+        <header className="mb-8 border-b border-white/10 pb-6">
+          <h1 className="text-3xl font-semibold tracking-tight text-white">
             Duel lobby
           </h1>
-          <p className="mt-3 text-base leading-7 text-slate-400">
-            Same questions, one race. The first correct answer scores, and the
-            highest score when time runs out wins.
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            You and your opponent get the same questions. The first correct
+            answer scores, and the highest score when time runs out wins.
           </p>
         </header>
 
@@ -1008,40 +785,34 @@ export default function DuelLobbyPage() {
           {/* -------------------------- Quick match -------------------------- */}
           <section
             aria-labelledby="quick-match-heading"
-            className={`self-start overflow-hidden lg:col-span-3 ${glass}`}
+            className={`self-start overflow-hidden lg:col-span-3 ${panel}`}
           >
-            <div className="px-6 pb-5 pt-6">
-              <h2 id="quick-match-heading" className="text-xl font-semibold text-white">
-                Quick match
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                We pair you with an online player at your level.
-              </p>
-            </div>
+            <PanelHeader
+              id="quick-match-heading"
+              title="Quick match"
+              subtitle="Get paired with an online player who picked the same settings."
+            />
 
             {findingOpponent ? (
               <div className="flex flex-col items-center border-t border-white/10 px-6 py-14 text-center">
-                <div className="relative flex h-24 w-24 items-center justify-center">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-indigo-500/30 motion-reduce:animate-none" />
-                  <span className="absolute inset-2 rounded-full ring-1 ring-cyan-300/40" />
-                  <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-400 text-white shadow-[0_0_30px_rgba(99,102,241,0.6)]">
-                    <Spinner className="h-7 w-7" />
-                  </span>
-                </div>
+                <span
+                  className={`flex h-14 w-14 items-center justify-center rounded-full ${accentGradient} text-white`}
+                >
+                  <Spinner className="h-6 w-6" />
+                </span>
 
-                <p className="mt-7 text-lg font-semibold text-white">
+                <p className="mt-6 text-lg font-semibold text-white">
                   Looking for an opponent
                 </p>
                 <p className="mt-1 text-sm text-slate-400">
                   {selectedLabel || "Searching"}
-                  <span className="mx-2 text-slate-600">|</span>
-                  <span className="tabular-nums">
-                    {formatElapsed(searchSeconds)}
-                  </span>
+                </p>
+                <p className="mt-4 text-3xl font-semibold tabular-nums text-white">
+                  {formatElapsed(searchSeconds)}
                 </p>
 
                 {isCustomSelected && (
-                  <p className="mt-3 max-w-sm text-xs leading-5 text-slate-500">
+                  <p className="mt-4 max-w-sm text-xs leading-5 text-slate-500">
                     {describeSettings(customSettings)}. You will be paired with
                     a player who picked the same rules.
                   </p>
@@ -1050,7 +821,7 @@ export default function DuelLobbyPage() {
                 <button
                   type="button"
                   onClick={handleLeaveQueue}
-                  className={`mt-8 rounded-lg bg-white/5 px-5 py-2.5 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 ${focusRing}`}
+                  className={`mt-8 ${secondaryButton} ${focusRing}`}
                 >
                   Cancel search
                 </button>
@@ -1099,7 +870,7 @@ export default function DuelLobbyPage() {
                                     aria-pressed={selected}
                                     className={`min-w-[4.5rem] rounded-lg px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
                                       selected
-                                        ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.5)]"
+                                        ? `${accentGradient} text-white`
                                         : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10 hover:text-white"
                                     }`}
                                   >
@@ -1118,7 +889,7 @@ export default function DuelLobbyPage() {
                 </div>
 
                 {isCustomSelected && (
-                  <div className="border-t border-white/10 bg-white/[0.02] px-6 py-5">
+                  <div className="border-t border-white/10 bg-black/20 px-6 py-5">
                     <h3 className="text-sm font-semibold text-white">
                       Custom rules
                     </h3>
@@ -1166,7 +937,7 @@ export default function DuelLobbyPage() {
                               title={operation.name}
                               className={`h-10 w-12 rounded-lg text-lg font-medium transition ${focusRing} ${
                                 on
-                                  ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.45)]"
+                                  ? `${accentGradient} text-white`
                                   : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10"
                               }`}
                             >
@@ -1256,7 +1027,7 @@ export default function DuelLobbyPage() {
                     disabled={
                       loading || !selectedConfigurationId || Boolean(customError)
                     }
-                    className={`shrink-0 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-7 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${focusRing}`}
+                    className={`shrink-0 px-7 py-3 ${primaryButton} ${focusRing}`}
                   >
                     Find opponent
                   </button>
@@ -1270,27 +1041,25 @@ export default function DuelLobbyPage() {
             {/* Incoming challenges */}
             <section
               aria-labelledby="incoming-heading"
-              className={`${glass} ${
-                incomingChallenges.length > 0
-                  ? "!ring-indigo-400/60 shadow-[0_0_40px_-8px_rgba(99,102,241,0.5)]"
-                  : ""
+              className={`${panel} ${
+                incomingChallenges.length > 0 ? "!border-indigo-400/50" : ""
               }`}
             >
-              <div className="flex items-center justify-between px-6 py-5">
-                <h2 id="incoming-heading" className="text-lg font-semibold text-white">
-                  Challenges for you
-                </h2>
-
-                {incomingChallenges.length > 0 && (
-                  <span className="rounded-full bg-indigo-500 px-2.5 py-0.5 text-xs font-semibold text-white">
-                    {incomingChallenges.length}
-                  </span>
-                )}
-              </div>
+              <PanelHeader
+                id="incoming-heading"
+                title="Challenges for you"
+                badge={
+                  incomingChallenges.length > 0 ? (
+                    <span className="rounded-full bg-indigo-500 px-2.5 py-0.5 text-xs font-semibold text-white">
+                      {incomingChallenges.length}
+                    </span>
+                  ) : undefined
+                }
+              />
 
               {incomingChallenges.length === 0 ? (
                 <p className="border-t border-white/10 px-6 py-5 text-sm text-slate-500">
-                  Nothing waiting. New challenges appear here automatically.
+                  No challenges right now. New ones show up here automatically.
                 </p>
               ) : (
                 <ul className="divide-y divide-white/5 border-t border-white/10">
@@ -1327,7 +1096,7 @@ export default function DuelLobbyPage() {
                               handleRespondToChallenge(challengeId, true)
                             }
                             disabled={busy}
-                            className={`flex-1 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50 ${focusRing}`}
+                            className={`flex-1 ${primaryButton} !px-3 !py-2 ${focusRing}`}
                           >
                             {respondingChallengeId === challengeId
                               ? "Joining..."
@@ -1339,7 +1108,7 @@ export default function DuelLobbyPage() {
                               handleRespondToChallenge(challengeId, false)
                             }
                             disabled={busy}
-                            className={`flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/15 transition hover:bg-white/10 disabled:opacity-50 ${focusRing}`}
+                            className={`flex-1 ${secondaryButton} !px-3 ${focusRing}`}
                           >
                             Decline
                           </button>
@@ -1352,31 +1121,29 @@ export default function DuelLobbyPage() {
             </section>
 
             {/* Friends */}
-            <section
-              aria-labelledby="friends-heading"
-              className={glass}
-            >
-              <div className="px-6 py-5">
-                <h2 id="friends-heading" className="text-lg font-semibold text-white">
-                  Challenge a friend
-                </h2>
-                {!loading && friends.length > 0 && (
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        onlineCount > 0 ? "bg-emerald-400" : "bg-slate-600"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    {onlineCount} of {friends.length} online
-                  </p>
-                )}
-              </div>
+            <section aria-labelledby="friends-heading" className={panel}>
+              <PanelHeader
+                id="friends-heading"
+                title="Challenge a friend"
+                subtitle={
+                  !loading && friends.length > 0 ? (
+                    <span className="flex items-center gap-1.5 text-xs">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          onlineCount > 0 ? "bg-emerald-400" : "bg-slate-600"
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {onlineCount} of {friends.length} online
+                    </span>
+                  ) : undefined
+                }
+              />
 
               {sentChallenge && (
                 <div
                   role="status"
-                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-xl bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100 ring-1 ring-indigo-400/30"
+                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-lg bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100 ring-1 ring-indigo-400/30"
                 >
                   <div className="flex items-center gap-3">
                     <Spinner className="h-4 w-4 shrink-0 text-cyan-300" />
@@ -1401,7 +1168,7 @@ export default function DuelLobbyPage() {
 
               {loading ? (
                 <div
-                  className="animate-pulse space-y-4 border-t border-white/10 px-6 py-5"
+                  className="animate-pulse space-y-4 border-t border-white/10 px-6 py-5 motion-reduce:animate-none"
                   aria-hidden="true"
                 >
                   {[0, 1, 2].map((i) => (
@@ -1443,7 +1210,9 @@ export default function DuelLobbyPage() {
                           <div className="min-w-0">
                             <p
                               className={`truncate text-sm font-semibold ${
-                                friend.is_online ? "text-white" : "text-slate-400"
+                                friend.is_online
+                                  ? "text-white"
+                                  : "text-slate-400"
                               }`}
                             >
                               {name}
@@ -1474,7 +1243,7 @@ export default function DuelLobbyPage() {
                           className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${focusRing} ${
                             disabled
                               ? "bg-white/5 text-slate-500"
-                              : "bg-gradient-to-br from-indigo-500 to-violet-600 text-white hover:brightness-110"
+                              : `${accentGradient} text-white hover:brightness-110`
                           }`}
                         >
                           {sending ? "Sending..." : "Challenge"}
