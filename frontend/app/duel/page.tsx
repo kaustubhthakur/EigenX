@@ -157,22 +157,29 @@ function initials(name: string): string {
 }
 
 /* ------------------------------------------------------------------ */
-/* Shared styles and small presentational pieces                       */
+/* Shared styles (every surface has a light and a dark value)          */
 /* ------------------------------------------------------------------ */
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:focus-visible:outline-cyan-300";
 
-// Solid, quiet surface. Same navy/indigo palette as before, no blur or glow.
 const panel =
-  "rounded-xl border border-white/10 bg-slate-900/70 shadow-lg shadow-black/20";
+  "rounded-xl border border-slate-200 bg-white shadow-sm transition-colors duration-300 dark:border-white/10 dark:bg-slate-900/70 dark:shadow-lg dark:shadow-black/20";
 
 const accentGradient = "bg-gradient-to-br from-indigo-500 to-violet-600";
 
-const primaryButton = `rounded-lg ${accentGradient} px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:hover:brightness-100`;
+const primaryButton = `rounded-lg ${accentGradient} px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:hover:brightness-100 dark:disabled:bg-white/10 dark:disabled:text-slate-500`;
 
 const secondaryButton =
-  "rounded-lg border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10";
+
+const divider = "border-slate-200 dark:border-white/10";
+
+const chipIdle =
+  "bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/10 dark:hover:text-white";
+
+const insetBar =
+  "bg-slate-50 transition-colors duration-300 dark:bg-black/20";
 
 function Spinner({ className = "h-5 w-5" }: { className?: string }) {
   return (
@@ -217,11 +224,11 @@ function Avatar({
         <img
           src={url}
           alt=""
-          className="h-10 w-10 rounded-full object-cover ring-1 ring-white/15"
+          className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200 dark:ring-white/15"
         />
       ) : (
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${accentGradient} text-sm font-semibold text-white ring-1 ring-white/15`}
+          className={`flex h-10 w-10 items-center justify-center rounded-full ${accentGradient} text-sm font-semibold text-white ring-1 ring-slate-200 dark:ring-white/15`}
         >
           {initials(name)}
         </div>
@@ -229,8 +236,8 @@ function Avatar({
 
       {online !== undefined && (
         <span
-          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
-            online ? "bg-emerald-400" : "bg-slate-600"
+          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
+            online ? "bg-emerald-500 dark:bg-emerald-400" : "bg-slate-300 dark:bg-slate-600"
           }`}
           aria-hidden="true"
         />
@@ -254,7 +261,9 @@ function NumberField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-400">{label}</span>
+      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+        {label}
+      </span>
       <input
         type="number"
         inputMode="numeric"
@@ -262,7 +271,7 @@ function NumberField({
         max={max}
         value={Number.isNaN(value) ? "" : value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1.5 w-full rounded-lg border-0 bg-slate-950/60 px-3 py-2 text-sm tabular-nums text-white ring-1 ring-inset ring-white/10 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        className="mt-1.5 w-full rounded-lg border-0 bg-white px-3 py-2 text-sm tabular-nums text-slate-900 ring-1 ring-inset ring-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-950/60 dark:text-white dark:ring-white/10 dark:focus:ring-cyan-300"
       />
     </label>
   );
@@ -279,8 +288,8 @@ function Banner({
 }) {
   const styles =
     tone === "error"
-      ? "bg-red-500/10 text-red-200 ring-red-400/30"
-      : "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30";
+      ? "bg-red-50 text-red-800 ring-red-200 dark:bg-red-500/10 dark:text-red-200 dark:ring-red-400/30"
+      : "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-400/30";
 
   return (
     <div
@@ -315,10 +324,13 @@ function SkeletonRows({ count }: { count: number }) {
     >
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center gap-5">
-          <div className="h-4 w-16 rounded bg-white/10" />
+          <div className="h-4 w-16 rounded bg-slate-200 dark:bg-white/10" />
           <div className="flex gap-2">
             {[0, 1, 2, 3].map((n) => (
-              <div key={n} className="h-9 w-16 rounded-lg bg-white/5" />
+              <div
+                key={n}
+                className="h-9 w-16 rounded-lg bg-slate-100 dark:bg-white/5"
+              />
             ))}
           </div>
         </div>
@@ -341,11 +353,16 @@ function PanelHeader({
   return (
     <div className="flex items-start justify-between gap-4 px-6 py-5">
       <div className="min-w-0">
-        <h2 id={id} className="text-base font-semibold text-white">
+        <h2
+          id={id}
+          className="text-base font-semibold text-slate-900 dark:text-white"
+        >
           {title}
         </h2>
         {subtitle && (
-          <div className="mt-1 text-sm text-slate-400">{subtitle}</div>
+          <div className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            {subtitle}
+          </div>
         )}
       </div>
       {badge}
@@ -748,19 +765,23 @@ export default function DuelLobbyPage() {
   /* ------------------------------- render ------------------------------- */
 
   return (
-    <div className="relative isolate min-h-screen bg-[#070815] px-4 py-10 text-slate-100 sm:px-6 lg:py-14">
-      {/* Static ambient colour (same palette as before, no animation) */}
+    <div className="relative isolate min-h-screen bg-[#f4f5fb] px-4 py-10 text-slate-900 transition-colors duration-300 dark:bg-[#070815] dark:text-slate-100 sm:px-6 lg:py-14">
+      {/* Ambient colour: two layers that cross-fade when the theme changes */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_0%,rgba(99,102,241,0.18),transparent),radial-gradient(45%_40%_at_10%_100%,rgba(34,211,238,0.08),transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_0%,rgba(99,102,241,0.14),transparent),radial-gradient(45%_40%_at_10%_100%,rgba(34,211,238,0.10),transparent)] opacity-100 transition-opacity duration-500 dark:opacity-0"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_75%_0%,rgba(99,102,241,0.18),transparent),radial-gradient(45%_40%_at_10%_100%,rgba(34,211,238,0.08),transparent)] opacity-0 transition-opacity duration-500 dark:opacity-100"
       />
 
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 border-b border-white/10 pb-6">
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
+        <header className={`mb-8 border-b pb-6 ${divider}`}>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-white">
             Duel lobby
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
             You and your opponent get the same questions. The first correct
             answer scores, and the highest score when time runs out wins.
           </p>
@@ -794,20 +815,22 @@ export default function DuelLobbyPage() {
             />
 
             {findingOpponent ? (
-              <div className="flex flex-col items-center border-t border-white/10 px-6 py-14 text-center">
+              <div
+                className={`flex flex-col items-center border-t px-6 py-14 text-center ${divider}`}
+              >
                 <span
                   className={`flex h-14 w-14 items-center justify-center rounded-full ${accentGradient} text-white`}
                 >
                   <Spinner className="h-6 w-6" />
                 </span>
 
-                <p className="mt-6 text-lg font-semibold text-white">
+                <p className="mt-6 text-lg font-semibold text-slate-900 dark:text-white">
                   Looking for an opponent
                 </p>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                   {selectedLabel || "Searching"}
                 </p>
-                <p className="mt-4 text-3xl font-semibold tabular-nums text-white">
+                <p className="mt-4 text-3xl font-semibold tabular-nums text-slate-900 dark:text-white">
                   {formatElapsed(searchSeconds)}
                 </p>
 
@@ -828,16 +851,16 @@ export default function DuelLobbyPage() {
               </div>
             ) : (
               <>
-                <div className="border-t border-white/10 px-6 py-5">
+                <div className={`border-t px-6 py-5 ${divider}`}>
                   {loading ? (
                     <SkeletonRows count={4} />
                   ) : levels.length === 0 ? (
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
                       No game settings are available right now. Try again in a
                       moment.
                     </p>
                   ) : (
-                    <div className="divide-y divide-white/5">
+                    <div className="divide-y divide-slate-100 dark:divide-white/5">
                       {levels.map(({ level, items }) => {
                         const customGroup = items.some(isCustomConfiguration);
                         const groupName = customGroup
@@ -851,7 +874,7 @@ export default function DuelLobbyPage() {
                             aria-label={`${groupName} options`}
                             className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-6"
                           >
-                            <p className="w-20 shrink-0 text-sm font-semibold text-slate-200">
+                            <p className="w-20 shrink-0 text-sm font-semibold text-slate-800 dark:text-slate-200">
                               {groupName}
                             </p>
 
@@ -871,7 +894,7 @@ export default function DuelLobbyPage() {
                                     className={`min-w-[4.5rem] rounded-lg px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
                                       selected
                                         ? `${accentGradient} text-white`
-                                        : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10 hover:text-white"
+                                        : chipIdle
                                     }`}
                                   >
                                     {isCustomConfiguration(configuration)
@@ -889,11 +912,11 @@ export default function DuelLobbyPage() {
                 </div>
 
                 {isCustomSelected && (
-                  <div className="border-t border-white/10 bg-black/20 px-6 py-5">
-                    <h3 className="text-sm font-semibold text-white">
+                  <div className={`border-t px-6 py-5 ${divider} ${insetBar}`}>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                       Custom rules
                     </h3>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                       Quick match pairs you with a player who chose the same
                       rules. Challenges use your rules.
                     </p>
@@ -918,7 +941,7 @@ export default function DuelLobbyPage() {
                     </div>
 
                     <fieldset className="mt-5">
-                      <legend className="text-xs font-medium text-slate-400">
+                      <legend className="text-xs font-medium text-slate-600 dark:text-slate-400">
                         Operations
                       </legend>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -936,9 +959,7 @@ export default function DuelLobbyPage() {
                               aria-label={operation.name}
                               title={operation.name}
                               className={`h-10 w-12 rounded-lg text-lg font-medium transition ${focusRing} ${
-                                on
-                                  ? `${accentGradient} text-white`
-                                  : "bg-white/5 text-slate-300 ring-1 ring-inset ring-white/10 hover:bg-white/10"
+                                on ? `${accentGradient} text-white` : chipIdle
                               }`}
                             >
                               {operation.label}
@@ -996,18 +1017,23 @@ export default function DuelLobbyPage() {
                     </p>
 
                     {customError && (
-                      <p role="alert" className="mt-4 text-sm text-red-300">
+                      <p
+                        role="alert"
+                        className="mt-4 text-sm text-red-600 dark:text-red-300"
+                      >
                         {customError}
                       </p>
                     )}
                   </div>
                 )}
 
-                <div className="flex flex-col gap-4 border-t border-white/10 bg-black/20 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 text-sm text-slate-400">
+                <div
+                  className={`flex flex-col gap-4 border-t px-6 py-5 sm:flex-row sm:items-center sm:justify-between ${divider} ${insetBar}`}
+                >
+                  <div className="min-w-0 text-sm text-slate-600 dark:text-slate-400">
                     {selectedConfiguration ? (
                       <>
-                        <p className="font-semibold text-white">
+                        <p className="font-semibold text-slate-900 dark:text-white">
                           {selectedLabel}
                         </p>
                         {isCustomSelected && !customError && (
@@ -1042,7 +1068,7 @@ export default function DuelLobbyPage() {
             <section
               aria-labelledby="incoming-heading"
               className={`${panel} ${
-                incomingChallenges.length > 0 ? "!border-indigo-400/50" : ""
+                incomingChallenges.length > 0 ? "!border-indigo-400/60" : ""
               }`}
             >
               <PanelHeader
@@ -1058,11 +1084,13 @@ export default function DuelLobbyPage() {
               />
 
               {incomingChallenges.length === 0 ? (
-                <p className="border-t border-white/10 px-6 py-5 text-sm text-slate-500">
+                <p className={`border-t px-6 py-5 text-sm text-slate-500 ${divider}`}>
                   No challenges right now. New ones show up here automatically.
                 </p>
               ) : (
-                <ul className="divide-y divide-white/5 border-t border-white/10">
+                <ul
+                  className={`divide-y divide-slate-100 border-t dark:divide-white/5 ${divider}`}
+                >
                   {incomingChallenges.map((challenge) => {
                     const challengeId = String(challenge.id);
                     const name = challenge.challenger_username || "A friend";
@@ -1073,17 +1101,17 @@ export default function DuelLobbyPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={name} src={challenge.challenger_avatar} />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white">
+                            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
                               {name}
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               Level {challenge.challenger_level ?? "-"} player
                             </p>
                           </div>
                         </div>
 
                         {challenge.custom_settings && (
-                          <p className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs leading-5 text-slate-300">
+                          <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs leading-5 text-slate-700 dark:bg-white/5 dark:text-slate-300">
                             Custom rules:{" "}
                             {describeSettings(challenge.custom_settings)}
                           </p>
@@ -1130,7 +1158,9 @@ export default function DuelLobbyPage() {
                     <span className="flex items-center gap-1.5 text-xs">
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          onlineCount > 0 ? "bg-emerald-400" : "bg-slate-600"
+                          onlineCount > 0
+                            ? "bg-emerald-500 dark:bg-emerald-400"
+                            : "bg-slate-300 dark:bg-slate-600"
                         }`}
                         aria-hidden="true"
                       />
@@ -1143,10 +1173,10 @@ export default function DuelLobbyPage() {
               {sentChallenge && (
                 <div
                   role="status"
-                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-lg bg-indigo-500/10 px-4 py-3 text-sm text-indigo-100 ring-1 ring-indigo-400/30"
+                  className="mx-6 mb-4 flex items-center justify-between gap-3 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-900 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-100 dark:ring-indigo-400/30"
                 >
                   <div className="flex items-center gap-3">
-                    <Spinner className="h-4 w-4 shrink-0 text-cyan-300" />
+                    <Spinner className="h-4 w-4 shrink-0 text-indigo-600 dark:text-cyan-300" />
                     <p>
                       Waiting for{" "}
                       <span className="font-semibold">
@@ -1159,7 +1189,7 @@ export default function DuelLobbyPage() {
                   <button
                     type="button"
                     onClick={handleCancelChallenge}
-                    className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-cyan-200 transition hover:bg-white/10 ${focusRing}`}
+                    className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:text-cyan-200 dark:hover:bg-white/10 ${focusRing}`}
                   >
                     Cancel
                   </button>
@@ -1168,22 +1198,24 @@ export default function DuelLobbyPage() {
 
               {loading ? (
                 <div
-                  className="animate-pulse space-y-4 border-t border-white/10 px-6 py-5 motion-reduce:animate-none"
+                  className={`animate-pulse space-y-4 border-t px-6 py-5 motion-reduce:animate-none ${divider}`}
                   aria-hidden="true"
                 >
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-white/10" />
-                      <div className="h-4 w-28 rounded bg-white/10" />
+                      <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-white/10" />
+                      <div className="h-4 w-28 rounded bg-slate-200 dark:bg-white/10" />
                     </div>
                   ))}
                 </div>
               ) : friends.length === 0 ? (
-                <p className="border-t border-white/10 px-6 py-5 text-sm text-slate-500">
+                <p className={`border-t px-6 py-5 text-sm text-slate-500 ${divider}`}>
                   No friends yet. Add friends to challenge them to a duel.
                 </p>
               ) : (
-                <ul className="divide-y divide-white/5 border-t border-white/10">
+                <ul
+                  className={`divide-y divide-slate-100 border-t dark:divide-white/5 ${divider}`}
+                >
                   {sortedFriends.map((friend) => {
                     const friendId = String(friend.id);
                     const name = friend.username || "Friend";
@@ -1211,8 +1243,8 @@ export default function DuelLobbyPage() {
                             <p
                               className={`truncate text-sm font-semibold ${
                                 friend.is_online
-                                  ? "text-white"
-                                  : "text-slate-400"
+                                  ? "text-slate-900 dark:text-white"
+                                  : "text-slate-500 dark:text-slate-400"
                               }`}
                             >
                               {name}
@@ -1220,8 +1252,8 @@ export default function DuelLobbyPage() {
                             <p
                               className={`text-xs ${
                                 friend.is_online
-                                  ? "text-emerald-400"
-                                  : "text-slate-500"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-slate-400 dark:text-slate-500"
                               }`}
                             >
                               {friend.is_online ? "Online" : "Offline"}
@@ -1242,7 +1274,7 @@ export default function DuelLobbyPage() {
                           }
                           className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${focusRing} ${
                             disabled
-                              ? "bg-white/5 text-slate-500"
+                              ? "bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500"
                               : `${accentGradient} text-white hover:brightness-110`
                           }`}
                         >
