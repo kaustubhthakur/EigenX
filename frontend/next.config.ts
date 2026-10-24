@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "192.168.0.100",
     "192.168.0.101",
+    "192.168.0.102"
   ],
 
   turbopack: {
