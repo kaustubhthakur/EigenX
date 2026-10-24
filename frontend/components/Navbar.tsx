@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { logoutUser } from "../lib/api";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", auth: false },
@@ -15,7 +16,7 @@ const NAV_LINKS = [
 ];
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:focus-visible:outline-indigo-400";
 
 export default function Navbar() {
   const { user, loading, logoutLocal } = useAuth();
@@ -92,22 +93,22 @@ export default function Navbar() {
 
   const avatar = (size: string) => (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full bg-indigo-500/20 font-semibold text-indigo-200 ring-1 ring-inset ring-indigo-400/40 ${size}`}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-indigo-500/15 font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-500/30 dark:bg-indigo-500/20 dark:text-indigo-200 dark:ring-indigo-400/40 ${size}`}
     >
       {initial}
     </span>
   );
 
-  const secondaryButton = `inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white ${focusRing}`;
+  const secondaryButton = `inline-flex h-9 items-center justify-center rounded-lg px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white ${focusRing}`;
 
-  const primaryButton = `inline-flex h-9 items-center justify-center rounded-lg bg-indigo-500 px-4 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/10 transition-colors hover:bg-indigo-400 ${focusRing}`;
+  const primaryButton = `inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/10 transition-colors hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400 ${focusRing}`;
 
   return (
     <header
-      className={`sticky top-0 z-30 border-b backdrop-blur-xl transition-colors duration-200 ${
+      className={`sticky top-0 z-30 border-b backdrop-blur-xl transition-colors duration-300 ${
         scrolled
-          ? "border-white/10 bg-[#070815]/85"
-          : "border-white/[0.06] bg-[#070815]/55"
+          ? "border-slate-200 bg-white/85 dark:border-white/10 dark:bg-[#070815]/85"
+          : "border-slate-200/70 bg-white/60 dark:border-white/[0.06] dark:bg-[#070815]/55"
       }`}
     >
       <nav
@@ -120,19 +121,17 @@ export default function Navbar() {
             href="/"
             className={`flex items-center gap-2.5 rounded-lg ${focusRing}`}
           >
-            
-
- 
-<Image
-  src="/logo.png"
-  alt="EigenX"
-  width={32}
-  height={32}
-  priority
-  className="h-8 w-8 object-contain mix-blend-multiply"
-/>
-
-            <span className="text-[15px] font-semibold tracking-tight text-white">
+            {/* If your logo is a white mark, brightness-0 turns it dark on the
+                light theme. Remove it if the logo already works on both. */}
+            <Image
+              src="/logo.png"
+              alt="EigenX"
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-8 object-contain mix-blend-multiply brightness-0 dark:brightness-100"
+            />
+            <span className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white">
               EigenX
             </span>
           </Link>
@@ -146,14 +145,16 @@ export default function Navbar() {
                   href={link.href}
                   aria-current={active ? "page" : undefined}
                   className={`relative flex h-16 items-center px-3.5 text-sm font-medium transition-colors ${focusRing} ${
-                    active ? "text-white" : "text-slate-400 hover:text-white"
+                    active
+                      ? "text-slate-900 dark:text-white"
+                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
                   }`}
                 >
                   {link.label}
                   {active && (
                     <span
                       aria-hidden="true"
-                      className="absolute inset-x-3.5 bottom-0 h-0.5 rounded-full bg-indigo-400"
+                      className="absolute inset-x-3.5 bottom-0 h-0.5 rounded-full bg-indigo-500 dark:bg-indigo-400"
                     />
                   )}
                 </Link>
@@ -164,8 +165,10 @@ export default function Navbar() {
 
         {/* Desktop account area */}
         <div className="hidden items-center gap-2 md:flex">
+          <ThemeToggle />
+
           {loading ? (
-            <div className="h-8 w-8 animate-pulse rounded-full bg-white/10" />
+            <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200 dark:bg-white/10" />
           ) : user ? (
             <div ref={userMenuRef} className="relative">
               <button
@@ -173,10 +176,10 @@ export default function Navbar() {
                 onClick={() => setUserMenuOpen((o) => !o)}
                 aria-haspopup="menu"
                 aria-expanded={userMenuOpen}
-                className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-white/5 ${focusRing}`}
+                className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-slate-900/5 dark:hover:bg-white/5 ${focusRing}`}
               >
                 {avatar("h-8 w-8 text-sm")}
-                <span className="max-w-[120px] truncate text-sm font-medium text-slate-200">
+                <span className="max-w-[120px] truncate text-sm font-medium text-slate-800 dark:text-slate-200">
                   {user.username}
                 </span>
                 <svg
@@ -189,7 +192,7 @@ export default function Navbar() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   aria-hidden="true"
-                  className={`text-slate-500 transition-transform ${
+                  className={`text-slate-400 transition-transform dark:text-slate-500 ${
                     userMenuOpen ? "rotate-180" : ""
                   }`}
                 >
@@ -200,19 +203,19 @@ export default function Navbar() {
               {userMenuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0d0e24]/95 p-1.5 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+                  className="absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.25)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0d0e24]/95 dark:shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]"
                 >
                   <div className="px-3 py-2">
                     <p className="text-xs text-slate-500">Signed in as</p>
-                    <p className="truncate text-sm font-medium text-white">
+                    <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
                       {user.username}
                     </p>
                   </div>
-                  <div className="my-1 h-px bg-white/10" />
+                  <div className="my-1 h-px bg-slate-200 dark:bg-white/10" />
                   <Link
                     href="/dashboard"
                     role="menuitem"
-                    className={`flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white ${focusRing}`}
+                    className={`flex w-full items-center rounded-lg px-3 py-2 text-sm text-slate-700 transition-colors hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white ${focusRing}`}
                   >
                     Your profile
                   </Link>
@@ -221,7 +224,7 @@ export default function Navbar() {
                     role="menuitem"
                     onClick={handleLogout}
                     disabled={loggingOut}
-                    className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-300 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60 ${focusRing}`}
+                    className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-900/5 hover:text-slate-900 disabled:opacity-60 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white ${focusRing}`}
                   >
                     {loggingOut ? "Logging out…" : "Log out"}
                   </button>
@@ -240,39 +243,42 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile toggle */}
-        <button
-          type="button"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
-          aria-controls="mobile-menu"
-          className={`flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/5 hover:text-white md:hidden ${focusRing}`}
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            aria-hidden="true"
+        {/* Mobile controls */}
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            className={`flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 ring-1 ring-inset ring-slate-300 transition-colors hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-300 dark:ring-white/15 dark:hover:bg-white/5 dark:hover:text-white ${focusRing}`}
           >
-            {menuOpen ? (
-              <path d="M6 6l12 12M18 6L6 18" />
-            ) : (
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            )}
-          </svg>
-        </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              {menuOpen ? (
+                <path d="M6 6l12 12M18 6L6 18" />
+              ) : (
+                <path d="M4 7h16M4 12h16M4 17h16" />
+              )}
+            </svg>
+          </button>
+        </div>
       </nav>
 
       {/* Mobile menu */}
       {menuOpen && (
         <div
           id="mobile-menu"
-          className="border-t border-white/10 bg-[#0a0b1e]/95 px-4 pb-5 pt-3 backdrop-blur-xl md:hidden"
+          className="border-t border-slate-200 bg-white/95 px-4 pb-5 pt-3 backdrop-blur-xl dark:border-white/10 dark:bg-[#0a0b1e]/95 md:hidden"
         >
           <div className="flex flex-col">
             {links.map((link) => {
@@ -284,15 +290,15 @@ export default function Navbar() {
                   aria-current={active ? "page" : undefined}
                   className={`flex items-center justify-between rounded-lg px-3 py-3 text-[15px] font-medium transition-colors ${focusRing} ${
                     active
-                      ? "bg-white/[0.06] text-white"
-                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                      ? "bg-slate-900/[0.05] text-slate-900 dark:bg-white/[0.06] dark:text-white"
+                      : "text-slate-500 hover:bg-slate-900/5 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white"
                   }`}
                 >
                   {link.label}
                   {active && (
                     <span
                       aria-hidden="true"
-                      className="h-1.5 w-1.5 rounded-full bg-indigo-400"
+                      className="h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400"
                     />
                   )}
                 </Link>
@@ -300,12 +306,12 @@ export default function Navbar() {
             })}
           </div>
 
-          <div className="mt-3 border-t border-white/10 pt-4">
+          <div className="mt-3 border-t border-slate-200 pt-4 dark:border-white/10">
             {loading ? null : user ? (
               <div className="flex items-center justify-between gap-3 px-1">
                 <div className="flex min-w-0 items-center gap-2.5">
                   {avatar("h-9 w-9 text-sm")}
-                  <span className="truncate text-sm font-medium text-slate-200">
+                  <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
                     {user.username}
                   </span>
                 </div>
@@ -313,7 +319,7 @@ export default function Navbar() {
                   type="button"
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className={`inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-slate-200 ring-1 ring-inset ring-white/15 transition-colors hover:bg-white/5 disabled:opacity-60 ${focusRing}`}
+                  className={`inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-300 transition-colors hover:bg-slate-900/5 disabled:opacity-60 dark:text-slate-200 dark:ring-white/15 dark:hover:bg-white/5 ${focusRing}`}
                 >
                   {loggingOut ? "Logging out…" : "Log out"}
                 </button>
@@ -322,7 +328,7 @@ export default function Navbar() {
               <div className="grid grid-cols-2 gap-2">
                 <Link
                   href="/login"
-                  className={`${secondaryButton} h-10 ring-1 ring-inset ring-white/15`}
+                  className={`${secondaryButton} h-10 ring-1 ring-inset ring-slate-300 dark:ring-white/15`}
                 >
                   Log in
                 </Link>
