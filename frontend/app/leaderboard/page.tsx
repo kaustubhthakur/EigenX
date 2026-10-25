@@ -16,10 +16,10 @@ const display = Space_Grotesk({
 type Phase = "loading" | "loaded" | "error";
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:focus-visible:outline-cyan-300";
 
 const glass =
-  "rounded-2xl bg-slate-950/60 ring-1 ring-cyan-300/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.7)]";
+  "rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm transition-colors duration-300 dark:bg-slate-950/60 dark:ring-cyan-300/10 dark:backdrop-blur-xl dark:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.7)]";
 
 /** Which difficulty a player's best score was set on. */
 const levelLabel = (d: number | null | undefined, score: number) =>
@@ -31,13 +31,17 @@ const formatScore = (n: number | null | undefined) =>
 /** Shield colour by rank band, like the tier badges in the reference. */
 const tierOf = (rank: number) =>
   rank <= 3
-    ? { name: "Podium", cls: "text-cyan-300" }
+    ? { name: "Podium", cls: "text-cyan-600 dark:text-cyan-300" }
     : rank <= 10
-      ? { name: "Top 10", cls: "text-fuchsia-300" }
-      : { name: "Ranked", cls: "text-slate-500" };
+      ? { name: "Top 10", cls: "text-fuchsia-600 dark:text-fuchsia-300" }
+      : { name: "Ranked", cls: "text-slate-400 dark:text-slate-500" };
 
 const rankTone = (rank: number) =>
-  rank === 2 ? "text-slate-200" : rank === 3 ? "text-orange-300" : "text-slate-400";
+  rank === 2
+    ? "text-slate-600 dark:text-slate-200"
+    : rank === 3
+      ? "text-orange-600 dark:text-orange-300"
+      : "text-slate-500 dark:text-slate-400";
 
 /* ------------------------------------------------------------------ */
 /* Small pieces                                                        */
@@ -108,12 +112,12 @@ function Avatar({
     <img
       src={url}
       alt=""
-      className={`${size} ${shape} shrink-0 object-cover ring-2 ring-white/10`}
+      className={`${size} ${shape} shrink-0 object-cover ring-2 ring-slate-200 dark:ring-white/10`}
     />
   ) : (
     <span
       aria-hidden="true"
-      className={`${size} ${shape} ${text} flex shrink-0 items-center justify-center bg-gradient-to-br from-indigo-500 to-violet-600 font-semibold text-white ring-2 ring-white/10`}
+      className={`${size} ${shape} ${text} flex shrink-0 items-center justify-center bg-gradient-to-br from-indigo-500 to-violet-600 font-semibold text-white ring-2 ring-slate-200 dark:ring-white/10`}
     >
       {entry.username?.[0]?.toUpperCase() || "?"}
     </span>
@@ -122,19 +126,19 @@ function Avatar({
 
 function YouBadge() {
   return (
-    <span className="shrink-0 rounded-full bg-indigo-400/15 px-1.5 py-px text-[10px] font-medium text-indigo-200 ring-1 ring-inset ring-indigo-300/30">
+    <span className="shrink-0 rounded-full bg-indigo-500/10 px-1.5 py-px text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-500/30 dark:bg-indigo-400/15 dark:text-indigo-200 dark:ring-indigo-300/30">
       You
     </span>
   );
 }
 
-/** Dark navy stage with a faint circuit pattern and neon flares. No WebGL. */
+/** Page stage with a faint circuit pattern and soft colour flares. No WebGL. */
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#050816] text-slate-100">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#f4f6fb] text-slate-900 transition-colors duration-300 dark:bg-[#050816] dark:text-slate-100">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
         <svg
-          className="absolute inset-0 h-full w-full opacity-[0.16] [mask-image:radial-gradient(80%_65%_at_50%_25%,#000,transparent)]"
+          className="absolute inset-0 h-full w-full opacity-[0.10] [mask-image:radial-gradient(80%_65%_at_50%_25%,#000,transparent)] dark:opacity-[0.16]"
           aria-hidden="true"
         >
           <defs>
@@ -152,7 +156,10 @@ function Shell({ children }: { children: ReactNode }) {
           </defs>
           <rect width="100%" height="100%" fill="url(#lb-circuit)" />
         </svg>
-        <div className="absolute inset-0 bg-[radial-gradient(55%_40%_at_50%_0%,rgba(99,102,241,0.28),transparent),radial-gradient(35%_30%_at_0%_45%,rgba(14,165,233,0.30),transparent),radial-gradient(35%_30%_at_100%_45%,rgba(14,165,233,0.30),transparent),radial-gradient(40%_30%_at_50%_100%,rgba(217,70,239,0.12),transparent)]" />
+
+        {/* Two flare layers that cross-fade when the theme changes */}
+        <div className="absolute inset-0 bg-[radial-gradient(55%_40%_at_50%_0%,rgba(99,102,241,0.14),transparent),radial-gradient(35%_30%_at_0%_45%,rgba(14,165,233,0.12),transparent),radial-gradient(35%_30%_at_100%_45%,rgba(14,165,233,0.12),transparent),radial-gradient(40%_30%_at_50%_100%,rgba(217,70,239,0.06),transparent)] opacity-100 transition-opacity duration-500 dark:opacity-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(55%_40%_at_50%_0%,rgba(99,102,241,0.28),transparent),radial-gradient(35%_30%_at_0%_45%,rgba(14,165,233,0.30),transparent),radial-gradient(35%_30%_at_100%_45%,rgba(14,165,233,0.30),transparent),radial-gradient(40%_30%_at_50%_100%,rgba(217,70,239,0.12),transparent)] opacity-0 transition-opacity duration-500 dark:opacity-100" />
       </div>
       <div className="relative z-10">{children}</div>
     </div>
@@ -167,12 +174,14 @@ function StatCards({ items }: { items: Stat[] }) {
       {items.map((item) => (
         <div key={item.label} className={`${glass} p-4 sm:p-5`}>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-xs font-medium text-slate-400">{item.label}</dt>
+            <dt className="text-xs font-medium text-slate-600 dark:text-slate-400">
+              {item.label}
+            </dt>
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${
                 item.accent
-                  ? "bg-cyan-400/10 text-cyan-200 ring-cyan-300/30"
-                  : "bg-white/[0.05] text-slate-400 ring-white/10"
+                  ? "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-300/30"
+                  : "bg-slate-100 text-slate-500 ring-slate-200 dark:bg-white/[0.05] dark:text-slate-400 dark:ring-white/10"
               }`}
             >
               <Icon d={item.icon} />
@@ -181,8 +190,8 @@ function StatCards({ items }: { items: Stat[] }) {
           <dd
             className={`${display.className} mt-3 truncate text-2xl font-bold tabular-nums ${
               item.accent
-                ? "bg-gradient-to-r from-cyan-300 to-indigo-300 bg-clip-text text-transparent"
-                : "text-white"
+                ? "bg-gradient-to-r from-cyan-600 to-indigo-600 bg-clip-text text-transparent dark:from-cyan-300 dark:to-indigo-300"
+                : "text-slate-900 dark:text-white"
             }`}
           >
             {item.value}
@@ -207,11 +216,11 @@ function Champion({
   return (
     <section
       aria-label="Current leader"
-      className="relative mb-6 overflow-hidden rounded-3xl bg-slate-950/60 px-4 py-8 text-center ring-1 ring-cyan-300/20 backdrop-blur-xl shadow-[0_0_70px_-18px_rgba(56,189,248,0.55)] sm:py-10"
+      className="relative mb-6 overflow-hidden rounded-3xl bg-white px-4 py-8 text-center ring-1 ring-cyan-400/30 shadow-[0_0_60px_-20px_rgba(14,165,233,0.35)] transition-colors duration-300 dark:bg-slate-950/60 dark:ring-cyan-300/20 dark:backdrop-blur-xl dark:shadow-[0_0_70px_-18px_rgba(56,189,248,0.55)] sm:py-10"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_70%_at_50%_0%,rgba(251,191,36,0.14),transparent_70%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_70%_at_50%_0%,rgba(251,191,36,0.12),transparent_70%)] dark:bg-[radial-gradient(50%_70%_at_50%_0%,rgba(251,191,36,0.14),transparent_70%)]"
       />
       <div className="relative">
         <div className="relative mx-auto h-28 w-28 sm:h-32 sm:w-32">
@@ -225,32 +234,36 @@ function Champion({
             />
           </div>
           <Shield
-            className="absolute -right-4 -top-3 h-11 w-11 text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]"
+            className="absolute -right-4 -top-3 h-11 w-11 text-amber-500 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)] dark:text-amber-300"
             title="Rank 1"
           />
         </div>
 
-        <p className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-300">
-          <span className={`${display.className} font-bold text-amber-300`}>#01</span>
-          <span className="max-w-[16rem] truncate font-semibold text-white">{entry.username}</span>
+        <p className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+          <span className={`${display.className} font-bold text-amber-600 dark:text-amber-300`}>
+            #01
+          </span>
+          <span className="max-w-[16rem] truncate font-semibold text-slate-900 dark:text-white">
+            {entry.username}
+          </span>
           {mine && <YouBadge />}
         </p>
         <p
-          className={`${display.className} mt-1 text-5xl font-bold tabular-nums tracking-tight text-white sm:text-6xl`}
+          className={`${display.className} mt-1 text-5xl font-bold tabular-nums tracking-tight text-slate-900 dark:text-white sm:text-6xl`}
         >
           {formatScore(entry.top_score)}
         </p>
-        <p className="mt-1 text-xs text-slate-400">Best score</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Best score</p>
 
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
-          <span className="rounded-full bg-cyan-400/10 px-3 py-1 font-medium text-cyan-200 ring-1 ring-inset ring-cyan-300/20">
+          <span className="rounded-full bg-cyan-50 px-3 py-1 font-medium text-cyan-800 ring-1 ring-inset ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-300/20">
             Set on {levelLabel(entry.difficulty_level, entry.top_score)}
           </span>
-          <span className="rounded-full bg-white/[0.06] px-3 py-1 font-medium tabular-nums text-slate-300 ring-1 ring-inset ring-white/10">
+          <span className="rounded-full bg-slate-100 px-3 py-1 font-medium tabular-nums text-slate-700 ring-1 ring-inset ring-slate-200 dark:bg-white/[0.06] dark:text-slate-300 dark:ring-white/10">
             Level {entry.level} · {entry.xp.toLocaleString("en-US")} XP
           </span>
           {lead !== null && lead > 0 && (
-            <span className="rounded-full bg-emerald-400/10 px-3 py-1 font-medium tabular-nums text-emerald-300 ring-1 ring-inset ring-emerald-300/20">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 font-medium tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-300/20">
               +{lead.toLocaleString("en-US")} pts ahead of 2nd
             </span>
           )}
@@ -264,21 +277,27 @@ function Skeleton() {
   return (
     <Shell>
       <div
-        className="mx-auto max-w-4xl animate-pulse px-4 py-10 sm:px-6 sm:py-14"
+        className="mx-auto max-w-4xl animate-pulse px-4 py-10 motion-reduce:animate-none sm:px-6 sm:py-14"
         aria-busy="true"
         aria-live="polite"
       >
-        <div className="h-9 w-48 rounded-lg bg-white/10" />
-        <div className="mt-3 h-4 w-64 rounded bg-white/10" />
+        <div className="h-9 w-48 rounded-lg bg-slate-200 dark:bg-white/10" />
+        <div className="mt-3 h-4 w-64 rounded bg-slate-200 dark:bg-white/10" />
         <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-[104px] rounded-2xl bg-white/5 ring-1 ring-white/10" />
+            <div
+              key={i}
+              className="h-[104px] rounded-2xl bg-white ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10"
+            />
           ))}
         </div>
-        <div className="mt-6 h-[300px] rounded-3xl bg-white/[0.03] ring-1 ring-white/10" />
+        <div className="mt-6 h-[300px] rounded-3xl bg-white/70 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10" />
         <div className="mt-6 space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-white/5 ring-1 ring-white/10" />
+            <div
+              key={i}
+              className="h-16 rounded-xl bg-white ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10"
+            />
           ))}
         </div>
       </div>
@@ -364,17 +383,19 @@ export default function LeaderboardPage() {
     return (
       <Shell>
         <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-400/30">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/30">
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 8v4M12 16h.01" />
             </svg>
           </span>
-          <p className="mt-4 text-sm font-semibold text-white">Couldn&apos;t load the leaderboard</p>
-          <p className="mt-1 max-w-sm text-sm text-slate-400">{errorMsg}</p>
+          <p className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
+            Couldn&apos;t load the leaderboard
+          </p>
+          <p className="mt-1 max-w-sm text-sm text-slate-600 dark:text-slate-400">{errorMsg}</p>
           <button
             onClick={load}
-            className={`mt-5 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`}
+            className={`mt-5 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.5)] transition hover:brightness-110 dark:shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] ${focusRing}`}
           >
             Try again
           </button>
@@ -431,11 +452,11 @@ export default function LeaderboardPage() {
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1
-              className={`${display.className} text-3xl font-bold tracking-tight text-white sm:text-4xl`}
+              className={`${display.className} text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl`}
             >
               Leaderboard
             </h1>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
               {entries.length > 0
                 ? `${entries.length.toLocaleString("en-US")} ${entries.length === 1 ? "player" : "players"} ranked by best score`
                 : "Rankings update as players finish games"}
@@ -445,7 +466,7 @@ export default function LeaderboardPage() {
             type="button"
             onClick={refresh}
             disabled={refreshing}
-            className={`inline-flex h-9 items-center gap-2 self-start rounded-lg bg-white/[0.05] px-3.5 text-sm font-medium text-slate-200 ring-1 ring-inset ring-white/10 transition hover:bg-white/10 disabled:opacity-60 sm:self-auto ${focusRing}`}
+            className={`inline-flex h-9 items-center gap-2 self-start rounded-lg bg-white px-3.5 text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 disabled:opacity-60 dark:bg-white/[0.05] dark:text-slate-200 dark:ring-white/10 dark:hover:bg-white/10 sm:self-auto ${focusRing}`}
           >
             <Icon d={ICONS.refresh} className={`h-4 w-4 ${refreshing ? "motion-safe:animate-spin" : ""}`} />
             {refreshing ? "Refreshing" : "Refresh"}
@@ -453,9 +474,13 @@ export default function LeaderboardPage() {
         </header>
 
         {!champion ? (
-          <div className={`${glass} border border-dashed border-white/15 px-6 py-16 text-center`}>
-            <p className="text-sm font-semibold text-white">No scores yet</p>
-            <p className="mt-1 text-sm text-slate-400">Finish a game to claim the first spot.</p>
+          <div
+            className={`${glass} border border-dashed border-slate-300 px-6 py-16 text-center dark:border-white/15`}
+          >
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">No scores yet</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Finish a game to claim the first spot.
+            </p>
           </div>
         ) : (
           <>
@@ -470,9 +495,11 @@ export default function LeaderboardPage() {
             {rest.length > 0 && (
               <section className={`overflow-hidden ${glass}`}>
                 {/* Toolbar */}
-                <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3.5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                   <div>
-                    <h2 className="text-sm font-semibold text-white">All players</h2>
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      All players
+                    </h2>
                     <p className="text-xs text-slate-500">
                       Ranked 2nd and below · {rest.length.toLocaleString("en-US")}{" "}
                       {rest.length === 1 ? "player" : "players"}
@@ -482,7 +509,7 @@ export default function LeaderboardPage() {
                     <div
                       role="group"
                       aria-label="Filter players"
-                      className="inline-flex rounded-lg bg-white/[0.05] p-0.5 ring-1 ring-inset ring-white/10"
+                      className="inline-flex rounded-lg bg-slate-100 p-0.5 ring-1 ring-inset ring-slate-200 dark:bg-white/[0.05] dark:ring-white/10"
                     >
                       {(
                         [
@@ -497,12 +524,12 @@ export default function LeaderboardPage() {
                           onClick={() => setFilter(t.id)}
                           className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
                             filter === t.id
-                              ? "bg-white/10 text-white shadow-sm"
-                              : "text-slate-400 hover:text-slate-200"
+                              ? "bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white"
+                              : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                           } ${focusRing}`}
                         >
                           {t.id === "online" && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                           )}
                           {t.label}
                           <span className="tabular-nums text-slate-500">{t.count}</span>
@@ -510,7 +537,7 @@ export default function LeaderboardPage() {
                       ))}
                     </div>
                     <div className="relative min-w-0 flex-1 sm:w-52 sm:flex-none">
-                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500">
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                         <Icon d={ICONS.search} />
                       </span>
                       <input
@@ -519,7 +546,7 @@ export default function LeaderboardPage() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search players"
                         aria-label="Search players"
-                        className="h-9 w-full rounded-lg bg-white/[0.05] pl-8 pr-3 text-sm text-white outline-none ring-1 ring-inset ring-white/10 transition placeholder:text-slate-500 focus:bg-white/[0.07] focus:ring-cyan-300/60"
+                        className="h-9 w-full rounded-lg bg-slate-100 pl-8 pr-3 text-sm text-slate-900 outline-none ring-1 ring-inset ring-slate-200 transition placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/60 dark:bg-white/[0.05] dark:text-white dark:ring-white/10 dark:placeholder:text-slate-500 dark:focus:bg-white/[0.07] dark:focus:ring-cyan-300/60"
                       />
                     </div>
                   </div>
@@ -527,8 +554,10 @@ export default function LeaderboardPage() {
 
                 {visibleRest.length === 0 ? (
                   <div className="px-6 py-14 text-center">
-                    <p className="text-sm font-semibold text-white">No players found</p>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      No players found
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                       Try a different name or switch the filter back to All.
                     </p>
                   </div>
@@ -546,8 +575,8 @@ export default function LeaderboardPage() {
                           aria-current={mine ? "true" : undefined}
                           className={`relative rounded-xl px-3 py-2.5 ring-1 ring-inset transition-colors sm:px-4 ${cols} ${
                             mine
-                              ? "bg-cyan-400/10 ring-cyan-300/40 shadow-[0_0_24px_-8px_rgba(56,189,248,0.6)]"
-                              : "bg-slate-900/50 ring-white/10 hover:bg-slate-900/80 hover:ring-cyan-300/25"
+                              ? "bg-cyan-50 shadow-[0_0_24px_-8px_rgba(14,165,233,0.4)] ring-cyan-400/50 dark:bg-cyan-400/10 dark:shadow-[0_0_24px_-8px_rgba(56,189,248,0.6)] dark:ring-cyan-300/40"
+                              : "bg-slate-50 ring-slate-200 hover:bg-white hover:ring-cyan-400/40 dark:bg-slate-900/50 dark:ring-white/10 dark:hover:bg-slate-900/80 dark:hover:ring-cyan-300/25"
                           }`}
                         >
                           <span
@@ -563,13 +592,13 @@ export default function LeaderboardPage() {
                               <Avatar entry={entry} size="h-10 w-10" shape="rounded-lg" />
                               {entry.is_online && (
                                 <span
-                                  className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-900 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+                                  className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.9)] dark:border-slate-900 dark:bg-emerald-400"
                                   title="Online"
                                 />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="flex items-center gap-2 text-sm font-semibold text-white">
+                              <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
                                 <span className="truncate">{entry.username}</span>
                                 {mine && <YouBadge />}
                               </p>
@@ -588,8 +617,8 @@ export default function LeaderboardPage() {
                             <span
                               className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
                                 entry.top_score > 0
-                                  ? "bg-cyan-400/10 text-cyan-200 ring-cyan-300/20"
-                                  : "text-slate-600 ring-transparent"
+                                  ? "bg-cyan-50 text-cyan-800 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-300/20"
+                                  : "text-slate-400 ring-transparent dark:text-slate-600"
                               }`}
                             >
                               {levelLabel(entry.difficulty_level, entry.top_score)}
@@ -599,18 +628,20 @@ export default function LeaderboardPage() {
                           <div className="text-right">
                             <span
                               className={`${display.className} text-lg font-bold tabular-nums ${
-                                entry.top_score > 0 ? "text-white" : "text-slate-600"
+                                entry.top_score > 0
+                                  ? "text-slate-900 dark:text-white"
+                                  : "text-slate-400 dark:text-slate-600"
                               }`}
                             >
                               {formatScore(entry.top_score)}
                             </span>
                             {entry.top_score > 0 && (
-                              <div className="ml-auto mt-1 hidden h-1 w-full overflow-hidden rounded-full bg-white/10 sm:block">
+                              <div className="ml-auto mt-1 hidden h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10 sm:block">
                                 <div
                                   className={`h-full rounded-full ${
                                     mine
-                                      ? "bg-gradient-to-r from-cyan-300 to-indigo-400"
-                                      : "bg-slate-500"
+                                      ? "bg-gradient-to-r from-cyan-400 to-indigo-500 dark:from-cyan-300 dark:to-indigo-400"
+                                      : "bg-slate-400 dark:bg-slate-500"
                                   }`}
                                   style={{ width: `${pct}%` }}
                                 />
@@ -625,7 +656,7 @@ export default function LeaderboardPage() {
                   </ol>
                 )}
 
-                <div className="border-t border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs text-slate-500 sm:px-5">
+                <div className="border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-500 dark:border-white/10 dark:bg-white/[0.02] sm:px-5">
                   Showing {visibleRest.length.toLocaleString("en-US")} of{" "}
                   {rest.length.toLocaleString("en-US")}
                 </div>
