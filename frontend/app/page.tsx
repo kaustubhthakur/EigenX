@@ -55,11 +55,11 @@ const FEATURES = [
 ];
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:focus-visible:outline-indigo-400";
 
-const primaryButton = `bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500 ${focusRing}`;
+const primaryButton = `bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 ${focusRing}`;
 
-const secondaryButton = `border border-slate-700 bg-transparent text-slate-200 transition hover:bg-slate-800 ${focusRing}`;
+const secondaryButton = `border border-slate-300 bg-transparent text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 ${focusRing}`;
 
 function validateCustom(s: CustomSettings): string | null {
   if (!Number.isInteger(s.timer) || s.timer < MIN_CUSTOM_TIMER || s.timer > MAX_CUSTOM_TIMER) {
@@ -163,14 +163,15 @@ export default function HomePage() {
   const chipClass = (active: boolean) =>
     `rounded-lg border px-3.5 py-2 text-sm font-medium transition ${focusRing} ${
       active
-        ? "border-indigo-500 bg-indigo-500/10 text-white"
-        : "border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+        ? "border-indigo-500 bg-indigo-50 text-indigo-900 dark:bg-indigo-500/10 dark:text-white"
+        : "border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
     }`;
 
   const fieldClass =
-    "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white [color-scheme:dark] focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30";
+    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30";
 
-  const labelClass = "mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-300";
+  const labelClass =
+    "mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300";
 
   const startDisabled =
     starting ||
@@ -189,7 +190,7 @@ export default function HomePage() {
     onChange: (v: number) => void,
     options: number[]
   ) => (
-    <label className="block text-xs font-medium text-slate-400">
+    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">
       {label}
       <select
         value={value}
@@ -197,7 +198,7 @@ export default function HomePage() {
         className={`${fieldClass} mt-1.5`}
       >
         {options.map((d) => (
-          <option key={d} value={d} className="bg-slate-900">
+          <option key={d} value={d} className="bg-white dark:bg-slate-900">
             {d}
           </option>
         ))}
@@ -206,17 +207,17 @@ export default function HomePage() {
   );
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-slate-950 px-4 py-12 text-slate-100 sm:px-6 sm:py-16">
+    <main className="min-h-[calc(100vh-64px)] bg-slate-50 px-4 py-12 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-16">
       <div className="mx-auto w-full max-w-3xl">
         {/* Hero */}
         <header className="text-center">
-          <span className="inline-flex items-center rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
             Mental math training
           </span>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-5xl">
             Mental math, at speed.
           </h1>
-          <p className="mx-auto mt-4 max-w-md text-base leading-7 text-slate-400">
+          <p className="mx-auto mt-4 max-w-md text-base leading-7 text-slate-600 dark:text-slate-400">
             Pick a level and a timer, then answer as fast as you can. Climb the
             leaderboard or challenge a friend to a duel.
           </p>
@@ -242,13 +243,16 @@ export default function HomePage() {
         {/* Start a game */}
         <section
           aria-labelledby="start-heading"
-          className="mx-auto mt-10 max-w-xl rounded-xl border border-slate-800 bg-slate-900"
+          className="mx-auto mt-10 max-w-xl rounded-xl border border-slate-200 bg-white shadow-sm transition-colors duration-300 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none"
         >
-          <div className="border-b border-slate-800 px-6 py-4">
-            <h2 id="start-heading" className="text-base font-semibold text-white">
+          <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+            <h2
+              id="start-heading"
+              className="text-base font-semibold text-slate-900 dark:text-white"
+            >
               Start a game
             </h2>
-            <p className="mt-0.5 text-sm text-slate-400">
+            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">
               {isCustomSelected
                 ? "Set your own arithmetic and timer."
                 : "Choose a level and a timer to begin."}
@@ -259,7 +263,7 @@ export default function HomePage() {
             {error && (
               <div
                 role="alert"
-                className="mb-5 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+                className="mb-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
               >
                 {error}
               </div>
@@ -356,7 +360,7 @@ export default function HomePage() {
                 </div>
 
                 {customError && (
-                  <p role="alert" className="mt-4 text-sm text-red-300">
+                  <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-300">
                     {customError}
                   </p>
                 )}
@@ -383,9 +387,10 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-slate-800 bg-slate-900/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-400">
-              Selected: <span className="font-medium text-slate-200">{summary}</span>
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/60 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Selected:{" "}
+              <span className="font-medium text-slate-900 dark:text-slate-200">{summary}</span>
             </p>
             <button
               type="button"
@@ -413,13 +418,17 @@ export default function HomePage() {
               <li key={href}>
                 <Link
                   href={href}
-                  className={`block h-full rounded-xl border border-slate-800 bg-slate-900/50 p-5 transition hover:border-slate-700 hover:bg-slate-900 ${focusRing}`}
+                  className={`block h-full rounded-xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:shadow-none ${focusRing}`}
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-300 ring-1 ring-inset ring-indigo-400/20">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/20">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </span>
-                  <h3 className="mt-4 text-sm font-semibold text-white">{title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">{text}</p>
+                  <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
+                    {title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                    {text}
+                  </p>
                 </Link>
               </li>
             ))}
