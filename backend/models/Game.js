@@ -41,7 +41,6 @@ exports.getGameSession = async (sessionId) => {
 };
 
 exports.getRandomArithmetic = async (level, customSettings = null) => {
-
   if (customSettings) {
     const ops = customSettings.operations;
     const operation = ops[Math.floor(Math.random() * ops.length)];
@@ -57,7 +56,6 @@ exports.getRandomArithmetic = async (level, customSettings = null) => {
       decimal_places: customSettings.decimal_places,
     };
   }
-
 
   const result = await pool.query(
     `
@@ -127,13 +125,16 @@ exports.updateScore = async (sessionId, score) => {
   return result.rows[0];
 };
 
-exports.updateTopScore = async (userId, score) => {
+// score   -> raw count of correct answers (used for top_score)
+// xpGain  -> XP added to the account; defaults to score so other callers
+//            (duels, etc.) keep their old behaviour
+exports.updateTopScore = async (userId, score, xpGain = score) => {
   const result = await pool.query(
     `
     UPDATE users
     SET
       top_score = GREATEST(top_score, $2),
-      xp = xp + $2,
+      xp = xp + $3,
       top_score_at = CASE
         WHEN $2 > top_score THEN NOW()
         ELSE top_score_at
@@ -141,7 +142,7 @@ exports.updateTopScore = async (userId, score) => {
     WHERE id = $1
     RETURNING id, top_score, top_score_at, xp
     `,
-    [userId, score]
+    [userId, score, xpGain]
   );
 
   return result.rows[0];

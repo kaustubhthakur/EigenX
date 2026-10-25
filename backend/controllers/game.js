@@ -1,4 +1,5 @@
 const Game = require("../models/Game");
+const { calculateXp } = require("../utils/scoring");
 
 const randomNumber = (digits) => {
   const safeDigits = Number.isFinite(digits) && digits > 0 ? digits : 1;
@@ -13,6 +14,15 @@ const randomNumberInRange = (minDigits, maxDigits) => {
   const max = Number.isFinite(maxDigits) ? maxDigits : min;
   const digits = Math.floor(Math.random() * (max - min + 1)) + min;
   return randomNumber(digits);
+};
+
+
+const randomRight = (rule) => {
+  let r;
+  do {
+    r = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
+  } while ((rule.operation === "*" || rule.operation === "/") && r <= 2);
+  return r;
 };
 
 const generateQuestion = (rule) => {
@@ -40,22 +50,38 @@ const generateQuestion = (rule) => {
 
     case "*":
       left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
-      right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
+      right = randomRight(rule);
       answer = left * right;
       break;
 
     case "/":
       if (!rule.decimal_places) {
-        right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
-        const leftTarget = randomNumberInRange(
-          rule.left_min_digits,
-          rule.left_max_digits
-        );
-        answer = Math.max(2, Math.floor(leftTarget / right));
-        left = answer * right;
+      
+        const lowLeft = Math.pow(10, rule.left_min_digits - 1);
+        const highLeft = Math.pow(10, rule.left_max_digits) - 1;
+
+        for (let i = 0; i < 100; i++) {
+          const r = randomRight(rule);
+          const minAns = Math.max(2, Math.ceil(lowLeft / r));
+          const maxAns = Math.floor(highLeft / r);
+
+          if (minAns <= maxAns) {
+            right = r;
+            answer = Math.floor(Math.random() * (maxAns - minAns + 1)) + minAns;
+            left = answer * right;
+            break;
+          }
+        }
+
+    
+        if (left === undefined) {
+          right = 10;
+          answer = randomNumber(1) + 1; // 2-10
+          left = answer * right;
+        }
       } else {
         left = randomNumberInRange(rule.left_min_digits, rule.left_max_digits);
-        right = randomNumberInRange(rule.right_min_digits, rule.right_max_digits);
+        right = randomRight(rule);
         answer = Number((left / right).toFixed(rule.decimal_places));
       }
       break;
@@ -91,7 +117,11 @@ exports.getQuestion = async (req, res) => {
 
     if (elapsed >= session.timer) {
       await Game.finishGame(session.id);
-      await Game.updateTopScore(session.user_id, session.score);
+      await Game.updateTopScore(
+        session.user_id,
+        session.score,
+        calculateXp(session.score, session.level)
+      );
       return res.status(200).json({
         success: true,
         gameOver: true,
@@ -166,7 +196,11 @@ exports.submitAnswer = async (req, res) => {
 
     if (elapsed >= session.timer) {
       await Game.finishGame(session.id);
-      await Game.updateTopScore(session.user_id, session.score);
+      await Game.updateTopScore(
+        session.user_id,
+        session.score,
+        calculateXp(session.score, session.level)
+      );
 
       return res.status(200).json({
         success: true,
@@ -204,6 +238,35 @@ exports.submitAnswer = async (req, res) => {
       success: false,
       message: err.message
     });
+  }
+};
+
+exports.cancelGame = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    const session = await Game.getGameSession(sessionId);
+
+    if (!session || session.is_finished) {
+      return res.status(404).json({
+        success: false,
+        message: "Game session not found"
+      });
+    }
+
+    if (String(session.user_id) !== String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Not your session"
+      });
+    }
+
+
+    await Game.finishGame(session.id);
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
