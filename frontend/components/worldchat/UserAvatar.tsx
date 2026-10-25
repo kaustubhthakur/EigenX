@@ -9,7 +9,7 @@ export default function UserAvatar({
   name: string;
   avatar?: string | null;
   size?: number;
-  /** Pass true/false to show a presence dot; omit to hide it. */
+  
   online?: boolean;
 }) {
   const url = resolveAvatarUrl(avatar);

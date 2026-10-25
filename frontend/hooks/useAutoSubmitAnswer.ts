@@ -3,17 +3,15 @@ import { isCorrectAnswer } from "../lib/solveQuestion";
 
 interface Options {
   question: string | null;
-  enabled: boolean; // true only while the round is actually playing
-  onSubmit: (value: number) => Promise<void>; // your submit API call
+  enabled: boolean; 
+  onSubmit: (value: number) => Promise<void>; 
 }
 
 export function useAutoSubmitAnswer({ question, enabled, onSubmit }: Options) {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const submittingRef = useRef(false); // synchronous double-fire guard
-
-  // New question (yours or the opponent scored): clear the box and refocus.
+  const submittingRef = useRef(false); 
   useEffect(() => {
     if (!enabled) return;
     setAnswer("");
