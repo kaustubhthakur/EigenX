@@ -1,8 +1,12 @@
 const pool = require("../db");
 
 
+const STANDARD_LEVELS = [1, 2];
+
+
 const STANDARD_LEVEL = 1;
 
+exports.STANDARD_LEVELS = STANDARD_LEVELS;
 exports.STANDARD_LEVEL = STANDARD_LEVEL;
 
 exports.getAllConfigurations = async () => {
@@ -14,11 +18,11 @@ exports.getAllConfigurations = async () => {
       timer,
       is_custom
     FROM configurations
-    WHERE level = $1
+    WHERE level = ANY($1)
        OR is_custom = TRUE
     ORDER BY level, timer
     `,
-    [STANDARD_LEVEL]
+    [STANDARD_LEVELS]
   );
 
   return result.rows;
