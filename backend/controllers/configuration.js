@@ -22,7 +22,7 @@ exports.startGame = async (req, res) => {
       });
     }
 
-    // The custom level has no preset rules, it must go through /start-custom
+
     if (configuration.is_custom) {
       return res.status(400).json({
         success: false,

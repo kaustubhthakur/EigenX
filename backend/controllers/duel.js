@@ -40,9 +40,6 @@ const getParticipant = (duel, userId) => {
   return 0;
 };
 
-/* ------------------------------------------------------------------ */
-/* Matchmaking queue                                                   */
-/* ------------------------------------------------------------------ */
 
 exports.joinDuel = async (req, res) => {
   try {
@@ -126,8 +123,7 @@ exports.getDuelById = async (req, res) => {
     const { duelId } = req.params;
     const userId = req.user.id;
 
-    // "/duel/active" can be swallowed by "/:duelId" depending on route
-    // order, so handle it here too.
+   
     if (duelId === "active") {
       return exports.getActiveDuel(req, res);
     }
@@ -236,12 +232,7 @@ exports.leaveDuelQueue = async (req, res) => {
   }
 };
 
-/* ------------------------------------------------------------------ */
-/* Active duel lookup (so the challenger can be sent into the duel)    */
-/* Route must be registered BEFORE any "/:duelId" route:               */
-/*   router.get("/active", auth, duelController.getActiveDuel);        */
-/* Requires Duel.getActiveDuelForUser in the model.                    */
-/* ------------------------------------------------------------------ */
+
 
 exports.getActiveDuel = async (req, res) => {
   try {
@@ -261,9 +252,7 @@ exports.getActiveDuel = async (req, res) => {
   }
 };
 
-/* ------------------------------------------------------------------ */
-/* Gameplay                                                            */
-/* ------------------------------------------------------------------ */
+
 
 exports.getQuestion = async (req, res) => {
   try {
@@ -361,8 +350,7 @@ exports.getQuestion = async (req, res) => {
   }
 };
 
-// First correct answer wins the point and immediately moves to the next
-// question. A wrong answer locks that player out until the question changes.
+
 exports.submitAnswer = async (req, res) => {
   try {
     const duelId = req.params.duelId ?? req.body.duelId;
@@ -505,9 +493,6 @@ exports.submitAnswer = async (req, res) => {
   }
 };
 
-/* ------------------------------------------------------------------ */
-/* Friend challenges                                                   */
-/* ------------------------------------------------------------------ */
 
 exports.challengeFriend = async (req, res) => {
   try {

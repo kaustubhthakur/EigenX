@@ -21,7 +21,7 @@ const emitToUser = (req, userId, event, payload) => {
 };
 
 
-// World duels use a real configuration (level + timer), set in WORLD_DUEL_CONFIG.
+
 const createWorldDuel = async ({ senderId, receiverId }) => {
   const { level, timer } = worldChat.WORLD_DUEL_CONFIG;
   const configurationId = await duelModel.findConfigurationId(level, timer);
