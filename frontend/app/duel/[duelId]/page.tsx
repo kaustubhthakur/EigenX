@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getDuelQuestion, submitDuelAnswer } from "@/lib/api";
 import { isCorrectAnswer } from "@/lib/solveQuestion";
-import DuelScene from "@/components/DuelScene";
 
 type DuelResponse = {
   success: boolean;
@@ -37,10 +36,13 @@ type AnswerResponse = DuelResponse & {
 };
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 dark:focus-visible:outline-cyan-300";
 
 const glass =
-  "rounded-2xl bg-slate-900/60 ring-1 ring-white/10 backdrop-blur-xl shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+  "rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm transition-colors duration-300 dark:bg-slate-900/60 dark:ring-white/10 dark:backdrop-blur-xl dark:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)]";
+
+const primaryGradient =
+  "bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.5)] transition hover:brightness-110 dark:shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)]";
 
 /* Circular countdown. Total time is the first value we see from the server. */
 function TimerRing({
@@ -71,7 +73,7 @@ function TimerRing({
           r={radius}
           fill="none"
           strokeWidth="6"
-          className="stroke-white/10"
+          className="stroke-slate-200 dark:stroke-white/10"
         />
         <circle
           cx="50"
@@ -83,7 +85,9 @@ function TimerRing({
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - progress)}
           className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${
-            urgent ? "stroke-rose-400" : "stroke-cyan-300"
+            urgent
+              ? "stroke-rose-500 dark:stroke-rose-400"
+              : "stroke-cyan-500 dark:stroke-cyan-300"
           }`}
         />
       </svg>
@@ -91,12 +95,14 @@ function TimerRing({
       <div className="text-center">
         <p
           className={`text-3xl font-semibold tabular-nums ${
-            urgent ? "text-rose-300" : "text-white"
+            urgent
+              ? "text-rose-600 dark:text-rose-300"
+              : "text-slate-900 dark:text-white"
           }`}
         >
           {remaining === null ? "--" : remaining}
         </p>
-        <p className="-mt-0.5 text-xs text-slate-400">seconds</p>
+        <p className="-mt-0.5 text-xs text-slate-500 dark:text-slate-400">seconds</p>
       </div>
     </div>
   );
@@ -115,17 +121,19 @@ function Score({
 }) {
   return (
     <div className={align === "right" ? "text-right" : "text-left"}>
-      <p className="text-sm text-slate-400">{label}</p>
+      <p className="text-sm text-slate-600 dark:text-slate-400">{label}</p>
       <p
         className={`text-5xl font-semibold tabular-nums transition-colors ${
-          leading ? "text-white" : "text-slate-300"
+          leading
+            ? "text-slate-900 dark:text-white"
+            : "text-slate-500 dark:text-slate-300"
         }`}
       >
         {value}
       </p>
       <span
         className={`mt-2 inline-block h-1 w-10 rounded-full transition-opacity ${
-          leading ? "bg-gradient-to-r from-indigo-400 to-cyan-300" : "opacity-0"
+          leading ? "bg-gradient-to-r from-indigo-500 to-cyan-400 dark:from-indigo-400 dark:to-cyan-300" : "opacity-0"
         }`}
         aria-hidden="true"
       />
@@ -399,20 +407,24 @@ export default function DuelPage() {
 
   const resultTone =
     outcome === "win"
-      ? "from-emerald-300 to-cyan-300"
+      ? "from-emerald-600 to-cyan-600 dark:from-emerald-300 dark:to-cyan-300"
       : outcome === "lose"
-        ? "from-rose-300 to-orange-300"
-        : "from-indigo-300 to-violet-300";
+        ? "from-rose-600 to-orange-600 dark:from-rose-300 dark:to-orange-300"
+        : "from-indigo-600 to-violet-600 dark:from-indigo-300 dark:to-violet-300";
 
   const feedbackIsGood = lastResult?.startsWith("Correct");
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#070815] text-slate-100">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#f4f5fb] text-slate-900 transition-colors duration-300 dark:bg-[#070815] dark:text-slate-100">
+      {/* Ambient colour: two layers that cross-fade when the theme changes */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_35%,rgba(99,102,241,0.22),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.12),transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_35%,rgba(99,102,241,0.14),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.10),transparent)] opacity-100 transition-opacity duration-500 dark:opacity-0"
       />
-      <DuelScene focus="center" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_35%,rgba(99,102,241,0.22),transparent),radial-gradient(40%_35%_at_90%_95%,rgba(34,211,238,0.12),transparent)] opacity-0 transition-opacity duration-500 dark:opacity-100"
+      />
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-6 px-4 py-10">
         {/* Scoreboard */}
@@ -445,7 +457,7 @@ export default function DuelPage() {
                   ? "Defeat"
                   : "Draw"}
             </h1>
-            <p className="mt-3 text-lg text-slate-300">{resultText}</p>
+            <p className="mt-3 text-lg text-slate-700 dark:text-slate-300">{resultText}</p>
             <p className="mt-1 text-sm tabular-nums text-slate-500">
               Final score {ownScore} to {opponentScore}
             </p>
@@ -453,7 +465,7 @@ export default function DuelPage() {
             <button
               type="button"
               onClick={() => router.push("/duel")}
-              className={`mt-8 rounded-lg bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-7 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 ${focusRing}`}
+              className={`mt-8 rounded-lg px-7 py-3 text-sm font-semibold ${primaryGradient} ${focusRing}`}
             >
               Back to duels
             </button>
@@ -465,7 +477,7 @@ export default function DuelPage() {
             {question ? (
               <>
                 <p
-                  className="bg-gradient-to-b from-white to-indigo-200 bg-clip-text text-5xl font-semibold tabular-nums tracking-tight text-transparent sm:text-6xl"
+                  className="bg-gradient-to-b from-slate-900 to-indigo-700 bg-clip-text text-5xl font-semibold tabular-nums tracking-tight text-transparent dark:from-white dark:to-indigo-200 sm:text-6xl"
                   aria-live="polite"
                 >
                   {question}
@@ -477,8 +489,8 @@ export default function DuelPage() {
                       role="status"
                       className={`inline-block rounded-full px-4 py-1.5 text-sm font-medium ring-1 ${
                         feedbackIsGood
-                          ? "bg-emerald-500/10 text-emerald-300 ring-emerald-400/30"
-                          : "bg-amber-500/10 text-amber-200 ring-amber-400/30"
+                          ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/30"
+                          : "bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/30"
                       }`}
                     >
                       {lastResult}
@@ -487,9 +499,9 @@ export default function DuelPage() {
                 </div>
 
                 {answered ? (
-                  <p className="mt-2 flex items-center justify-center gap-2 text-slate-400">
+                  <p className="mt-2 flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400">
                     <span
-                      className="h-2 w-2 animate-pulse rounded-full bg-cyan-300 motion-reduce:animate-none"
+                      className="h-2 w-2 animate-pulse rounded-full bg-cyan-500 motion-reduce:animate-none dark:bg-cyan-300"
                       aria-hidden="true"
                     />
                     {opponentAnswered
@@ -514,7 +526,7 @@ export default function DuelPage() {
                       autoComplete="off"
                       placeholder="Your answer"
                       aria-label="Your answer"
-                      className="w-full rounded-xl border-0 bg-white/5 px-4 py-4 text-center text-2xl font-medium tabular-nums text-white placeholder:text-slate-500 ring-1 ring-inset ring-white/15 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      className="w-full rounded-xl border-0 bg-white px-4 py-4 text-center text-2xl font-medium tabular-nums text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-white/5 dark:text-white dark:ring-white/15 dark:placeholder:text-slate-500 dark:focus:ring-cyan-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       autoFocus
                     />
 
@@ -528,7 +540,7 @@ export default function DuelPage() {
                         !answerInput.trim() ||
                         gameOver
                       }
-                      className={`w-full rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_rgba(99,102,241,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-none disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none ${focusRing}`}
+                      className={`w-full rounded-xl px-5 py-3.5 text-sm font-semibold ${primaryGradient} disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none dark:disabled:bg-white/10 dark:disabled:text-slate-500 ${focusRing}`}
                     >
                       {submitting ? "Submitting..." : "Submit answer"}
                     </button>
@@ -546,9 +558,9 @@ export default function DuelPage() {
                 )}
               </>
             ) : (
-              <div className="flex flex-col items-center gap-4 py-10 text-slate-400">
+              <div className="flex flex-col items-center gap-4 py-10 text-slate-600 dark:text-slate-400">
                 <span
-                  className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-cyan-300 motion-reduce:animate-none"
+                  className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 motion-reduce:animate-none dark:border-white/15 dark:border-t-cyan-300"
                   aria-hidden="true"
                 />
                 <p>Waiting for the first question...</p>
@@ -558,7 +570,7 @@ export default function DuelPage() {
             {error && (
               <p
                 role="alert"
-                className="mx-auto mt-5 max-w-sm rounded-lg bg-red-500/10 px-4 py-2.5 text-sm text-red-200 ring-1 ring-red-400/30"
+                className="mx-auto mt-5 max-w-sm rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-800 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-200 dark:ring-red-400/30"
               >
                 {error}
               </p>
