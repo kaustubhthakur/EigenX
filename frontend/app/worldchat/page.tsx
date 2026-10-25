@@ -30,7 +30,7 @@ const MAX_LENGTH = 500;
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:focus-visible:outline-indigo-400";
 
 /* Shared content column so header, messages and composer line up */
 const column = "mx-auto w-full max-w-3xl px-4 sm:px-6";
@@ -297,21 +297,23 @@ export default function WorldChatPage() {
   }
 
   return (
-    <main className="flex h-[calc(100vh-4rem)] flex-col bg-[#0b0d17]">
+    <main className="flex h-[calc(100vh-4rem)] flex-col bg-[#f4f6fb] transition-colors duration-300 dark:bg-[#0b0d17]">
       {/* Header */}
-      <header className="border-b border-white/10">
+      <header className="border-b border-slate-200 dark:border-white/10">
         <div className={`${column} flex items-center gap-3 py-3.5`}>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-indigo-300 ring-1 ring-inset ring-white/10">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 ring-1 ring-inset ring-slate-200 dark:bg-white/[0.06] dark:text-indigo-300 dark:ring-white/10">
             <ChatIcon />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[15px] font-semibold leading-tight text-white">World chat</h1>
-            <p className="truncate text-xs text-slate-400">
+            <h1 className="text-[15px] font-semibold leading-tight text-slate-900 dark:text-white">
+              World chat
+            </h1>
+            <p className="truncate text-xs text-slate-600 dark:text-slate-400">
               Open to everyone. Select a name to view a profile or send a challenge.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
             Live
           </span>
         </div>
@@ -334,7 +336,7 @@ export default function WorldChatPage() {
         <div
           ref={listRef}
           onScroll={onScroll}
-          className="h-full overflow-y-auto [scrollbar-color:rgba(255,255,255,0.14)_transparent] [scrollbar-width:thin]"
+          className="h-full overflow-y-auto [scrollbar-color:rgba(15,23,42,0.22)_transparent] [scrollbar-width:thin] dark:[scrollbar-color:rgba(255,255,255,0.14)_transparent]"
           aria-live="polite"
         >
           <div className={`${column} py-4`}>
@@ -342,26 +344,32 @@ export default function WorldChatPage() {
               <div className="space-y-5">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="flex gap-3">
-                    <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-white/10" />
+                    <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-slate-200 motion-reduce:animate-none dark:bg-white/10" />
                     <div className="flex-1 space-y-2 pt-1">
-                      <div className="h-3 w-32 animate-pulse rounded bg-white/10" />
-                      <div className="h-3 w-2/3 animate-pulse rounded bg-white/[0.06]" />
+                      <div className="h-3 w-32 animate-pulse rounded bg-slate-200 motion-reduce:animate-none dark:bg-white/10" />
+                      <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200/70 motion-reduce:animate-none dark:bg-white/[0.06]" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : loadError && messages.length === 0 ? (
-              <div className="mx-auto mt-16 max-w-xs rounded-lg border border-rose-400/20 bg-rose-400/5 p-4 text-center">
-                <p className="text-sm font-medium text-rose-200">Couldn’t load messages</p>
-                <p className="mt-1 text-xs text-rose-300/80">{loadError}</p>
+              <div className="mx-auto mt-16 max-w-xs rounded-lg border border-rose-300/60 bg-rose-50 p-4 text-center dark:border-rose-400/20 dark:bg-rose-400/5">
+                <p className="text-sm font-medium text-rose-700 dark:text-rose-200">
+                  Couldn’t load messages
+                </p>
+                <p className="mt-1 text-xs text-rose-600/80 dark:text-rose-300/80">{loadError}</p>
               </div>
             ) : messages.length === 0 ? (
               <div className="mx-auto mt-20 flex max-w-xs flex-col items-center text-center">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/[0.05] text-indigo-300 ring-1 ring-inset ring-white/10">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-indigo-600 ring-1 ring-inset ring-slate-200 dark:bg-white/[0.05] dark:text-indigo-300 dark:ring-white/10">
                   <ChatIcon />
                 </div>
-                <p className="mt-4 text-sm font-semibold text-white">No messages yet</p>
-                <p className="mt-1 text-sm text-slate-400">Say hello, then challenge someone to a duel.</p>
+                <p className="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
+                  No messages yet
+                </p>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Say hello, then challenge someone to a duel.
+                </p>
               </div>
             ) : (
               <ul>
@@ -383,16 +391,16 @@ export default function WorldChatPage() {
                     <Fragment key={m.id}>
                       {newDay && (
                         <li role="separator" className="my-5 flex items-center gap-3 first:mt-0">
-                          <span className="h-px flex-1 bg-white/10" />
-                          <span className="text-xs font-medium text-slate-400">
+                          <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                             {formatDay(m.created_at)}
                           </span>
-                          <span className="h-px flex-1 bg-white/10" />
+                          <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
                         </li>
                       )}
 
                       <li
-                        className={`group relative -mx-3 flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-white/[0.035] focus-within:bg-white/[0.035] ${
+                        className={`group relative -mx-3 flex gap-3 rounded-lg px-3 py-1 transition-colors hover:bg-slate-900/[0.04] focus-within:bg-slate-900/[0.04] dark:hover:bg-white/[0.035] dark:focus-within:bg-white/[0.035] ${
                           grouped ? "" : "mt-3 first:mt-0"
                         } ${mine ? "flex-row-reverse" : ""}`}
                       >
@@ -401,7 +409,7 @@ export default function WorldChatPage() {
                           {grouped ? (
                             <time
                               dateTime={m.created_at}
-                              className={`block pt-0.5 text-[11px] leading-6 text-slate-500 opacity-0 transition-opacity group-hover:opacity-100 ${
+                              className={`block pt-0.5 text-[11px] leading-6 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-slate-500 ${
                                 mine ? "text-left" : "text-right"
                               }`}
                             >
@@ -431,17 +439,19 @@ export default function WorldChatPage() {
                                 type="button"
                                 onClick={() => setProfileId(m.user_id)}
                                 className={`truncate rounded text-sm font-semibold hover:underline ${focusRing} ${
-                                  mine ? "text-indigo-300" : "text-white"
+                                  mine
+                                    ? "text-indigo-700 dark:text-indigo-300"
+                                    : "text-slate-900 dark:text-white"
                                 }`}
                               >
                                 {m.username}
                               </button>
                               {mine && (
-                                <span className="rounded bg-indigo-400/15 px-1.5 py-px text-[11px] font-medium text-indigo-200">
+                                <span className="rounded bg-indigo-500/10 px-1.5 py-px text-[11px] font-medium text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-200">
                                   You
                                 </span>
                               )}
-                              <span className="rounded bg-amber-400/10 px-1.5 py-px text-[11px] font-semibold text-amber-300">
+                              <span className="rounded bg-amber-500/10 px-1.5 py-px text-[11px] font-semibold text-amber-700 dark:bg-amber-400/10 dark:text-amber-300">
                                 Lv {level}
                               </span>
                               <time className="text-xs text-slate-500" dateTime={m.created_at}>
@@ -455,7 +465,7 @@ export default function WorldChatPage() {
                                 ? `${grouped ? "" : "mt-1"} max-w-[85%] rounded-2xl bg-indigo-500 px-3.5 py-2 text-left text-white ${
                                     grouped ? "" : "rounded-tr-md"
                                   }`
-                                : "text-slate-200"
+                                : "text-slate-800 dark:text-slate-200"
                             }`}
                           >
                             {m.content}
@@ -463,14 +473,14 @@ export default function WorldChatPage() {
                         </div>
 
                         {/* Hover toolbar */}
-                        <div className={`absolute -top-3 ${mine ? "left-3" : "right-3"} flex items-center rounded-lg border border-white/10 bg-[#141729] p-0.5 opacity-0 shadow-lg shadow-black/30 transition-opacity focus-within:opacity-100 group-hover:opacity-100`}>
+                        <div className={`absolute -top-3 ${mine ? "left-3" : "right-3"} flex items-center rounded-lg border border-slate-200 bg-white p-0.5 opacity-0 shadow-lg shadow-slate-900/10 transition-opacity focus-within:opacity-100 group-hover:opacity-100 dark:border-white/10 dark:bg-[#141729] dark:shadow-black/30`}>
                           {mine ? (
                             <button
                               type="button"
                               onClick={() => handleDelete(m.id)}
                               aria-label="Delete message"
                               title="Delete message"
-                              className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-400/10 hover:text-rose-300 ${focusRing}`}
+                              className={`flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-rose-400/10 dark:hover:text-rose-300 ${focusRing}`}
                             >
                               <TrashIcon />
                             </button>
@@ -478,7 +488,7 @@ export default function WorldChatPage() {
                             <button
                               type="button"
                               onClick={() => setProfileId(m.user_id)}
-                              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-300 transition hover:bg-indigo-400/15 hover:text-indigo-200 ${focusRing}`}
+                              className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-indigo-400/15 dark:hover:text-indigo-200 ${focusRing}`}
                             >
                               <SwordsIcon />
                               Challenge
@@ -498,7 +508,7 @@ export default function WorldChatPage() {
           <button
             type="button"
             onClick={jumpToLatest}
-            className={`absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-black/30 transition-colors hover:bg-indigo-400 ${focusRing}`}
+            className={`absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-indigo-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg shadow-slate-900/20 transition-colors hover:bg-indigo-400 dark:shadow-black/30 ${focusRing}`}
           >
             <ArrowDownIcon />
             Jump to latest
@@ -507,18 +517,21 @@ export default function WorldChatPage() {
       </div>
 
       {/* Composer */}
-      <form onSubmit={handleSend} className="border-t border-white/10 py-3">
+      <form
+        onSubmit={handleSend}
+        className="border-t border-slate-200 py-3 dark:border-white/10"
+      >
         <div className={column}>
           {notice && (
             <p
               role="status"
-              className="mb-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-slate-200"
+              className="mb-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200"
             >
               {notice}
             </p>
           )}
 
-          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#11142a] p-1.5 pl-4 transition focus-within:border-indigo-400/60 focus-within:ring-4 focus-within:ring-indigo-400/10">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white p-1.5 pl-4 transition focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/15 dark:border-white/10 dark:bg-[#11142a] dark:focus-within:border-indigo-400/60 dark:focus-within:ring-indigo-400/10">
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
@@ -526,12 +539,12 @@ export default function WorldChatPage() {
               aria-label="Message"
               maxLength={MAX_LENGTH}
               autoComplete="off"
-              className="h-9 min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+              className="h-9 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-500"
             />
             <button
               type="submit"
               disabled={!canSend}
-              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-indigo-500 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-slate-500 ${focusRing}`}
+              className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-indigo-500 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-white/[0.06] dark:disabled:text-slate-500 ${focusRing}`}
             >
               {sending ? (
                 "Sending…"
@@ -546,7 +559,7 @@ export default function WorldChatPage() {
 
           <div className="mt-1.5 flex items-center justify-between px-1 text-xs">
             {sendError ? (
-              <p role="alert" className="text-rose-300">
+              <p role="alert" className="text-rose-600 dark:text-rose-300">
                 {sendError}
               </p>
             ) : (
@@ -555,7 +568,9 @@ export default function WorldChatPage() {
             {nearLimit && (
               <span
                 className={`ml-auto tabular-nums ${
-                  draft.length >= MAX_LENGTH ? "text-rose-300" : "text-slate-500"
+                  draft.length >= MAX_LENGTH
+                    ? "text-rose-600 dark:text-rose-300"
+                    : "text-slate-500"
                 }`}
               >
                 {draft.length}/{MAX_LENGTH}
