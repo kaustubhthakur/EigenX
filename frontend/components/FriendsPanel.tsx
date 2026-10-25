@@ -36,10 +36,10 @@ type IncomingRequest = {
 type Tab = "friends" | "requests" | "add";
 
 const focusRing =
-  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300";
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:focus-visible:outline-cyan-300";
 
 const scrollArea =
-  "max-h-80 overflow-y-auto pr-1 [scrollbar-color:rgba(255,255,255,0.2)_transparent] [scrollbar-width:thin]";
+  "max-h-80 overflow-y-auto pr-1 [scrollbar-color:rgba(15,23,42,0.25)_transparent] [scrollbar-width:thin] dark:[scrollbar-color:rgba(255,255,255,0.2)_transparent]";
 
 function Avatar({
   name,
@@ -59,20 +59,20 @@ function Avatar({
         <img
           src={url}
           alt=""
-          className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
+          className="h-10 w-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-white/10"
         />
       ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-semibold text-white ring-2 ring-white/10">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-semibold text-white ring-2 ring-slate-200 dark:ring-white/10">
           {(name || "?").charAt(0).toUpperCase()}
         </div>
       )}
 
       {online !== undefined && (
         <span
-          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-slate-900 ${
+          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
             online
-              ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
-              : "bg-slate-600"
+              ? "bg-emerald-500 dark:bg-emerald-400 dark:shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              : "bg-slate-300 dark:bg-slate-600"
           }`}
           aria-hidden="true"
         />
@@ -93,12 +93,16 @@ function Row({
   action: ReactNode;
 }) {
   return (
-    <li className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 ring-1 ring-inset ring-white/10 transition hover:bg-white/[0.07]">
+    <li className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-100 dark:bg-white/[0.04] dark:ring-white/10 dark:hover:bg-white/[0.07]">
       <div className="flex min-w-0 items-center gap-3">
         {avatar}
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{title}</p>
-          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+            {title}
+          </p>
+          {subtitle && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+          )}
         </div>
       </div>
       {action}
@@ -239,9 +243,12 @@ export default function FriendsPanel(_props: {
   return (
     <section
       aria-label="Friends"
-      className="w-full overflow-hidden rounded-2xl bg-slate-900/70 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-xl"
+      className="w-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-colors duration-300 dark:bg-slate-900/70 dark:shadow-[0_10px_40px_-12px_rgba(0,0,0,0.6)] dark:ring-white/10 dark:backdrop-blur-xl"
     >
-      <div role="tablist" className="grid grid-cols-3 border-b border-white/10">
+      <div
+        role="tablist"
+        className="grid grid-cols-3 border-b border-slate-200 dark:border-white/10"
+      >
         {tabs.map(({ id, label, count }) => {
           const active = activeTab === id;
 
@@ -256,7 +263,9 @@ export default function FriendsPanel(_props: {
                 setError("");
               }}
               className={`relative flex items-center justify-center gap-2 px-3 py-4 text-sm font-medium transition-colors ${focusRing} ${
-                active ? "text-white" : "text-slate-400 hover:text-slate-200"
+                active
+                  ? "text-slate-900 dark:text-white"
+                  : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               {label}
@@ -266,7 +275,7 @@ export default function FriendsPanel(_props: {
                 </span>
               ) : null}
               {active && (
-                <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-400 to-cyan-300" />
+                <span className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 dark:from-indigo-400 dark:to-cyan-300" />
               )}
             </button>
           );
@@ -277,18 +286,24 @@ export default function FriendsPanel(_props: {
         {error && (
           <p
             role="alert"
-            className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-200 ring-1 ring-red-400/30"
+            className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-200 dark:ring-red-400/30"
           >
             {error}
           </p>
         )}
 
         {loading ? (
-          <div className="animate-pulse space-y-3 py-1" aria-busy="true">
+          <div
+            className="animate-pulse space-y-3 py-1 motion-reduce:animate-none"
+            aria-busy="true"
+          >
             {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-3">
-                <div className="h-10 w-10 rounded-full bg-white/10" />
-                <div className="h-3.5 w-28 rounded bg-white/10" />
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 dark:bg-white/[0.04]"
+              >
+                <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-white/10" />
+                <div className="h-3.5 w-28 rounded bg-slate-200 dark:bg-white/10" />
               </div>
             ))}
           </div>
@@ -313,7 +328,13 @@ export default function FriendsPanel(_props: {
                         title={friend.username}
                         subtitle={
                           friend.is_online !== undefined ? (
-                            <span className={friend.is_online ? "text-emerald-400" : ""}>
+                            <span
+                              className={
+                                friend.is_online
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : ""
+                              }
+                            >
                               {friend.is_online ? "Online" : "Offline"}
                             </span>
                           ) : undefined
@@ -323,7 +344,7 @@ export default function FriendsPanel(_props: {
                             type="button"
                             disabled={busyId === String(friend.id)}
                             onClick={() => void handleRemove(friend.id)}
-                            className={`shrink-0 rounded-lg bg-white/5 px-3 py-1.5 text-sm font-medium text-slate-300 ring-1 ring-inset ring-white/15 transition hover:bg-red-500/10 hover:text-red-300 hover:ring-red-400/40 disabled:opacity-50 ${focusRing}`}
+                            className={`shrink-0 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-slate-600 ring-1 ring-inset ring-slate-300 transition hover:bg-red-50 hover:text-red-600 hover:ring-red-300 disabled:opacity-50 dark:bg-white/5 dark:text-slate-300 dark:ring-white/15 dark:hover:bg-red-500/10 dark:hover:text-red-300 dark:hover:ring-red-400/40 ${focusRing}`}
                           >
                             Remove
                           </button>
@@ -372,7 +393,7 @@ export default function FriendsPanel(_props: {
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search by username..."
                   aria-label="Search by username"
-                  className="mb-3 w-full rounded-lg border-0 bg-white/5 px-3 py-2.5 text-sm text-white ring-1 ring-inset ring-white/15 placeholder:text-slate-500 [color-scheme:dark] focus:outline-none focus:ring-2 focus:ring-cyan-300"
+                  className="mb-3 w-full rounded-lg border-0 bg-white px-3 py-2.5 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-white/5 dark:text-white dark:ring-white/15 dark:placeholder:text-slate-500 dark:focus:ring-cyan-300"
                 />
 
                 {filteredUsers.length === 0 ? (
@@ -394,8 +415,8 @@ export default function FriendsPanel(_props: {
                               onClick={() => void handleSend(user.id)}
                               className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${focusRing} ${
                                 isRequested
-                                  ? "bg-white/5 text-slate-500"
-                                  : "bg-indigo-500/15 text-indigo-200 ring-1 ring-inset ring-indigo-300/30 hover:bg-indigo-500/25"
+                                  ? "bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500"
+                                  : "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-200 dark:ring-indigo-300/30 dark:hover:bg-indigo-500/25"
                               }`}
                             >
                               {isRequested ? "Requested" : "Add"}
